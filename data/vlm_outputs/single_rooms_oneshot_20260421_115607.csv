@@ -1,0 +1,27 @@
+id,label,confidence,x,y,width,height,notes
+room_1,room_1,0.64,78,58,38,60,Top-left enclosed service/core space.
+room_2,room_2,0.6,116,50,54,68,Top-left enclosed core compartment.
+room_3,room_3,0.57,171,50,43,68,Top-left narrow enclosed room/core area.
+room_4,room_4,0.94,79,118,136,226,Large enclosed room on the left side.
+room_5,room_5,0.72,79,346,34,76,Bottom-left small enclosed room.
+room_6,room_6,0.7,113,346,102,76,Bottom-left enclosed service/toilet cluster treated as one room.
+room_7,room_7,0.66,215,347,45,75,Bottom-left enclosed stair/core room.
+room_8,room_8,0.86,259,58,115,78,Top-center left room; split from the adjacent top-center room at the visible partition.
+room_9,room_9,0.86,374,58,145,78,Top-center right room; separate from room_8 by an internal wall.
+room_10,room_10,0.96,216,136,343,208,Large central enclosed room.
+room_11,room_11,0.63,519,58,41,78,Narrow enclosed core/service room above the central area.
+room_12,room_12,0.62,560,159,37,185,Narrow enclosed vertical room immediately left of the atrium-side block; counted separately.
+room_13,room_13,0.88,560,58,131,72,Top-right left room.
+room_14,room_14,0.88,691,58,114,72,Top-right middle room.
+room_15,room_15,0.66,805,50,29,80,Top-right enclosed service/core room.
+room_16,room_16,0.63,803,220,31,102,Right-side vertical enclosed service room.
+room_17,room_17,0.83,345,344,63,78,Bottom-center left room.
+room_18,room_18,0.83,408,344,63,78,Bottom-center middle room.
+room_19,room_19,0.81,471,344,53,78,Bottom-center right room.
+room_20,room_20,0.61,524,344,36,78,Bottom-middle enclosed core/service compartment.
+room_21,room_21,0.58,560,344,37,78,Bottom-middle narrow enclosed room/core space.
+room_22,room_22,0.82,597,352,62,70,Bottom-right left room.
+room_23,room_23,0.8,659,352,52,70,Bottom-right room.
+room_24,room_24,0.71,711,352,31,70,Bottom-right narrow enclosed room.
+room_25,room_25,0.8,742,352,59,70,Bottom-right right room.
+room_26,room_26,0.64,802,352,31,70,Far bottom-right enclosed service/core room.

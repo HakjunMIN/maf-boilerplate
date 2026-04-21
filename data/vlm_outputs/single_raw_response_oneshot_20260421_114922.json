@@ -1,0 +1,83 @@
+{
+  "id": "resp_0fe4b991268999470069e6e4f42fa88190875f5c484bb30e7c",
+  "created_at": 1776739572.0,
+  "error": null,
+  "incomplete_details": {
+    "reason": "content_filter"
+  },
+  "instructions": null,
+  "metadata": {},
+  "model": "gpt-5.4",
+  "object": "response",
+  "output": [
+    {
+      "id": "rs_0fe4b991268999470069e6e4f52c248190a3df0ce117512d08",
+      "summary": [],
+      "type": "reasoning",
+      "content": null,
+      "encrypted_content": null,
+      "status": null
+    },
+    {
+      "id": "msg_0fe4b991268999470069e6e5b29d008190b9c68aacfac22fa0",
+      "content": [
+        {
+          "annotations": [],
+          "text": "I'm sorry, but I cannot assist with that request.",
+          "type": "output_text",
+          "logprobs": []
+        }
+      ],
+      "role": "assistant",
+      "status": "incomplete",
+      "type": "message",
+      "phase": "final_answer"
+    }
+  ],
+  "parallel_tool_calls": true,
+  "temperature": 1.0,
+  "tool_choice": "auto",
+  "tools": [],
+  "top_p": 0.98,
+  "background": false,
+  "completed_at": null,
+  "conversation": null,
+  "max_output_tokens": null,
+  "max_tool_calls": null,
+  "previous_response_id": null,
+  "prompt": null,
+  "prompt_cache_key": null,
+  "prompt_cache_retention": null,
+  "reasoning": {
+    "effort": "high",
+    "generate_summary": null,
+    "summary": null
+  },
+  "safety_identifier": null,
+  "service_tier": "auto",
+  "status": "incomplete",
+  "text": {
+    "format": {
+      "type": "text"
+    },
+    "verbosity": "medium"
+  },
+  "top_logprobs": 0,
+  "truncation": "disabled",
+  "usage": {
+    "input_tokens": 0,
+    "input_tokens_details": {
+      "cached_tokens": 0
+    },
+    "output_tokens": 0,
+    "output_tokens_details": {
+      "reasoning_tokens": 0
+    },
+    "total_tokens": 0
+  },
+  "user": null,
+  "content_filters": null,
+  "frequency_penalty": 0.0,
+  "presence_penalty": 0.0,
+  "store": true
+}

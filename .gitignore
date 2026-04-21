@@ -1,0 +1,14 @@
+.venv/
+.ipynb_checkpoints/
+__pycache__/.DS_Store
+.venv/
+__pycache__/
+.pytest_cache/
+.env
+.env.*
+!.env.example
+backend/.venv/
+backend/.pytest_cache/
+backend/.coverage
+frontend/node_modules/
+frontend/dist/

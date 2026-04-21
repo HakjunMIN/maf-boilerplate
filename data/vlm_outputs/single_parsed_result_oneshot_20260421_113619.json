@@ -1,0 +1,112 @@
+{
+  "image_source": "original1.png",
+  "analysis_type": "room_extraction",
+  "summary": "Extracted 8 enclosed rooms/spaces from the floor plan, including a split of the large left-side area into two rooms and an additional enclosed room immediately left of the central-right room cluster.",
+  "rooms": [
+    {
+      "id": "room_1",
+      "label": "room_1",
+      "confidence": 0.9,
+      "bbox": {
+        "x": 79,
+        "y": 118,
+        "width": 136,
+        "height": 227
+      },
+      "notes": "Large enclosed room on the left side; separated from the lower-left service area and split from adjacent left-side enclosed area per instruction."
+    },
+    {
+      "id": "room_2",
+      "label": "room_2",
+      "confidence": 0.88,
+      "bbox": {
+        "x": 216,
+        "y": 136,
+        "width": 342,
+        "height": 283
+      },
+      "notes": "Main large central room occupying most of the middle-left portion."
+    },
+    {
+      "id": "room_3",
+      "label": "room_3",
+      "confidence": 0.82,
+      "bbox": {
+        "x": 345,
+        "y": 345,
+        "width": 212,
+        "height": 74
+      },
+      "notes": "Long narrow enclosed room along the bottom center; treated as a valid room due to clear enclosure."
+    },
+    {
+      "id": "room_4",
+      "label": "room_4",
+      "confidence": 0.8,
+      "bbox": {
+        "x": 558,
+        "y": 164,
+        "width": 39,
+        "height": 179
+      },
+      "notes": "Additional enclosed side space immediately left of the large right-side room; counted explicitly as a separate room."
+    },
+    {
+      "id": "room_5",
+      "label": "room_5",
+      "confidence": 0.91,
+      "bbox": {
+        "x": 597,
+        "y": 161,
+        "width": 186,
+        "height": 155
+      },
+      "notes": "Large enclosed room in the right-center with diagonal internal lines."
+    },
+    {
+      "id": "room_6",
+      "label": "room_6",
+      "confidence": 0.76,
+      "bbox": {
+        "x": 564,
+        "y": 352,
+        "width": 128,
+        "height": 31
+      },
+      "notes": "Narrow enclosed bottom-right room segment, separated by partitions."
+    },
+    {
+      "id": "room_7",
+      "label": "room_7",
+      "confidence": 0.77,
+      "bbox": {
+        "x": 699,
+        "y": 352,
+        "width": 47,
+        "height": 67
+      },
+      "notes": "Small enclosed room at lower right-center."
+    },
+    {
+      "id": "room_8",
+      "label": "room_8",
+      "confidence": 0.79,
+      "bbox": {
+        "x": 748,
+        "y": 352,
+        "width": 68,
+        "height": 67
+      },
+      "notes": "Enclosed room at the far lower right, distinct from adjacent small room."
+    }
+  ],
+  "warnings": [
+    "Several peripheral service/core spaces near the top-left, bottom-left, and far-right edges are highly partitioned and may contain additional small rooms not extracted here.",
+    "The bottom-center and bottom-right narrow spaces have weaker visual separation and are lower-confidence.",
+    "Central circulation/open corridor areas were not counted as rooms."
+  ],
+  "one_shot_example": {
+    "input": "/Users/andy/works/ai/maf-boilerplate/data/original2.png",
+    "target": "/Users/andy/works/ai/maf-boilerplate/data/target2.png"
+  }
+}

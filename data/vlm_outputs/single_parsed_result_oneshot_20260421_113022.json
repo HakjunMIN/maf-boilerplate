@@ -1,0 +1,173 @@
+{
+  "image_source": "image_3",
+  "analysis_type": "room_extraction",
+  "summary": "Extracted the main clearly enclosed room-like spaces, following the example style that favors larger separated rooms and excludes most corridor/open circulation areas.",
+  "rooms": [
+    {
+      "id": "room_1",
+      "label": "room_1",
+      "confidence": 0.95,
+      "bbox": {
+        "x": 79,
+        "y": 118,
+        "width": 136,
+        "height": 227
+      },
+      "notes": "Large enclosed room on the left side."
+    },
+    {
+      "id": "room_2",
+      "label": "room_2",
+      "confidence": 0.94,
+      "bbox": {
+        "x": 216,
+        "y": 136,
+        "width": 343,
+        "height": 284
+      },
+      "notes": "Largest central enclosed room."
+    },
+    {
+      "id": "room_3",
+      "label": "room_3",
+      "confidence": 0.82,
+      "bbox": {
+        "x": 373,
+        "y": 60,
+        "width": 143,
+        "height": 76
+      },
+      "notes": "Upper central rectangular room; boundary is clear though connected to adjacent top spaces."
+    },
+    {
+      "id": "room_4",
+      "label": "room_4",
+      "confidence": 0.8,
+      "bbox": {
+        "x": 560,
+        "y": 60,
+        "width": 130,
+        "height": 72
+      },
+      "notes": "Upper right-central room along the top edge."
+    },
+    {
+      "id": "room_5",
+      "label": "room_5",
+      "confidence": 0.79,
+      "bbox": {
+        "x": 694,
+        "y": 60,
+        "width": 103,
+        "height": 72
+      },
+      "notes": "Top right room, rectangular and clearly separated."
+    },
+    {
+      "id": "room_6",
+      "label": "room_6",
+      "confidence": 0.93,
+      "bbox": {
+        "x": 595,
+        "y": 161,
+        "width": 188,
+        "height": 155
+      },
+      "notes": "Large enclosed room surrounding the central square feature on the right side."
+    },
+    {
+      "id": "room_7",
+      "label": "room_7",
+      "confidence": 0.74,
+      "bbox": {
+        "x": 346,
+        "y": 345,
+        "width": 62,
+        "height": 75
+      },
+      "notes": "Small bottom-center room."
+    },
+    {
+      "id": "room_8",
+      "label": "room_8",
+      "confidence": 0.74,
+      "bbox": {
+        "x": 409,
+        "y": 345,
+        "width": 31,
+        "height": 75
+      },
+      "notes": "Narrow bottom-center room."
+    },
+    {
+      "id": "room_9",
+      "label": "room_9",
+      "confidence": 0.74,
+      "bbox": {
+        "x": 441,
+        "y": 345,
+        "width": 31,
+        "height": 75
+      },
+      "notes": "Narrow bottom-center room."
+    },
+    {
+      "id": "room_10",
+      "label": "room_10",
+      "confidence": 0.74,
+      "bbox": {
+        "x": 473,
+        "y": 345,
+        "width": 67,
+        "height": 75
+      },
+      "notes": "Bottom-center room adjacent to the right-side core."
+    },
+    {
+      "id": "room_11",
+      "label": "room_11",
+      "confidence": 0.72,
+      "bbox": {
+        "x": 628,
+        "y": 352,
+        "width": 63,
+        "height": 68
+      },
+      "notes": "Bottom-right room."
+    },
+    {
+      "id": "room_12",
+      "label": "room_12",
+      "confidence": 0.72,
+      "bbox": {
+        "x": 699,
+        "y": 352,
+        "width": 46,
+        "height": 68
+      },
+      "notes": "Bottom-right narrow room."
+    },
+    {
+      "id": "room_13",
+      "label": "room_13",
+      "confidence": 0.72,
+      "bbox": {
+        "x": 752,
+        "y": 352,
+        "width": 61,
+        "height": 68
+      },
+      "notes": "Bottom-right room near the corner."
+    }
+  ],
+  "warnings": [
+    "Extraction follows the example style and emphasizes larger enclosed rooms while excluding many service/core spaces and circulation zones.",
+    "Several small rooms near the left-bottom and right-edge cores are ambiguous due to dense wall and fixture detail.",
+    "The large right-side area contains an internal square feature; interpreted here as one enclosing room rather than multiple subspaces.",
+    "Top-edge spaces are partially segmented and may include corridor-adjacent areas with weaker separation."
+  ],
+  "one_shot_example": {
+    "input": "/Users/andy/works/ai/maf-boilerplate/data/original2.png",
+    "target": "/Users/andy/works/ai/maf-boilerplate/data/target2.png"
+  }
+}

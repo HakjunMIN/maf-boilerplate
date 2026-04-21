@@ -1,0 +1,329 @@
+{
+  "image_source": "original1.png",
+  "analysis_type": "room_extraction",
+  "summary": "Extracted 26 enclosed spaces from the floor plan, including a split of the top-center band into two rooms and a narrow enclosed room immediately left of the atrium-side block; open circulation and the central atrium were excluded.",
+  "rooms": [
+    {
+      "id": "room_1",
+      "label": "room_1",
+      "confidence": 0.64,
+      "bbox": {
+        "x": 78,
+        "y": 58,
+        "width": 38,
+        "height": 60
+      },
+      "notes": "Top-left enclosed service/core space."
+    },
+    {
+      "id": "room_2",
+      "label": "room_2",
+      "confidence": 0.6,
+      "bbox": {
+        "x": 116,
+        "y": 50,
+        "width": 54,
+        "height": 68
+      },
+      "notes": "Top-left enclosed core compartment."
+    },
+    {
+      "id": "room_3",
+      "label": "room_3",
+      "confidence": 0.57,
+      "bbox": {
+        "x": 171,
+        "y": 50,
+        "width": 43,
+        "height": 68
+      },
+      "notes": "Top-left narrow enclosed room/core area."
+    },
+    {
+      "id": "room_4",
+      "label": "room_4",
+      "confidence": 0.94,
+      "bbox": {
+        "x": 79,
+        "y": 118,
+        "width": 136,
+        "height": 226
+      },
+      "notes": "Large enclosed room on the left side."
+    },
+    {
+      "id": "room_5",
+      "label": "room_5",
+      "confidence": 0.72,
+      "bbox": {
+        "x": 79,
+        "y": 346,
+        "width": 34,
+        "height": 76
+      },
+      "notes": "Bottom-left small enclosed room."
+    },
+    {
+      "id": "room_6",
+      "label": "room_6",
+      "confidence": 0.7,
+      "bbox": {
+        "x": 113,
+        "y": 346,
+        "width": 102,
+        "height": 76
+      },
+      "notes": "Bottom-left enclosed service/toilet cluster treated as one room."
+    },
+    {
+      "id": "room_7",
+      "label": "room_7",
+      "confidence": 0.66,
+      "bbox": {
+        "x": 215,
+        "y": 347,
+        "width": 45,
+        "height": 75
+      },
+      "notes": "Bottom-left enclosed stair/core room."
+    },
+    {
+      "id": "room_8",
+      "label": "room_8",
+      "confidence": 0.86,
+      "bbox": {
+        "x": 259,
+        "y": 58,
+        "width": 115,
+        "height": 78
+      },
+      "notes": "Top-center left room; split from the adjacent top-center room at the visible partition."
+    },
+    {
+      "id": "room_9",
+      "label": "room_9",
+      "confidence": 0.86,
+      "bbox": {
+        "x": 374,
+        "y": 58,
+        "width": 145,
+        "height": 78
+      },
+      "notes": "Top-center right room; separate from room_8 by an internal wall."
+    },
+    {
+      "id": "room_10",
+      "label": "room_10",
+      "confidence": 0.96,
+      "bbox": {
+        "x": 216,
+        "y": 136,
+        "width": 343,
+        "height": 208
+      },
+      "notes": "Large central enclosed room."
+    },
+    {
+      "id": "room_11",
+      "label": "room_11",
+      "confidence": 0.63,
+      "bbox": {
+        "x": 519,
+        "y": 58,
+        "width": 41,
+        "height": 78
+      },
+      "notes": "Narrow enclosed core/service room above the central area."
+    },
+    {
+      "id": "room_12",
+      "label": "room_12",
+      "confidence": 0.62,
+      "bbox": {
+        "x": 560,
+        "y": 159,
+        "width": 37,
+        "height": 185
+      },
+      "notes": "Narrow enclosed vertical room immediately left of the atrium-side block; counted separately."
+    },
+    {
+      "id": "room_13",
+      "label": "room_13",
+      "confidence": 0.88,
+      "bbox": {
+        "x": 560,
+        "y": 58,
+        "width": 131,
+        "height": 72
+      },
+      "notes": "Top-right left room."
+    },
+    {
+      "id": "room_14",
+      "label": "room_14",
+      "confidence": 0.88,
+      "bbox": {
+        "x": 691,
+        "y": 58,
+        "width": 114,
+        "height": 72
+      },
+      "notes": "Top-right middle room."
+    },
+    {
+      "id": "room_15",
+      "label": "room_15",
+      "confidence": 0.66,
+      "bbox": {
+        "x": 805,
+        "y": 50,
+        "width": 29,
+        "height": 80
+      },
+      "notes": "Top-right enclosed service/core room."
+    },
+    {
+      "id": "room_16",
+      "label": "room_16",
+      "confidence": 0.63,
+      "bbox": {
+        "x": 803,
+        "y": 220,
+        "width": 31,
+        "height": 102
+      },
+      "notes": "Right-side vertical enclosed service room."
+    },
+    {
+      "id": "room_17",
+      "label": "room_17",
+      "confidence": 0.83,
+      "bbox": {
+        "x": 345,
+        "y": 344,
+        "width": 63,
+        "height": 78
+      },
+      "notes": "Bottom-center left room."
+    },
+    {
+      "id": "room_18",
+      "label": "room_18",
+      "confidence": 0.83,
+      "bbox": {
+        "x": 408,
+        "y": 344,
+        "width": 63,
+        "height": 78
+      },
+      "notes": "Bottom-center middle room."
+    },
+    {
+      "id": "room_19",
+      "label": "room_19",
+      "confidence": 0.81,
+      "bbox": {
+        "x": 471,
+        "y": 344,
+        "width": 53,
+        "height": 78
+      },
+      "notes": "Bottom-center right room."
+    },
+    {
+      "id": "room_20",
+      "label": "room_20",
+      "confidence": 0.61,
+      "bbox": {
+        "x": 524,
+        "y": 344,
+        "width": 36,
+        "height": 78
+      },
+      "notes": "Bottom-middle enclosed core/service compartment."
+    },
+    {
+      "id": "room_21",
+      "label": "room_21",
+      "confidence": 0.58,
+      "bbox": {
+        "x": 560,
+        "y": 344,
+        "width": 37,
+        "height": 78
+      },
+      "notes": "Bottom-middle narrow enclosed room/core space."
+    },
+    {
+      "id": "room_22",
+      "label": "room_22",
+      "confidence": 0.82,
+      "bbox": {
+        "x": 597,
+        "y": 352,
+        "width": 62,
+        "height": 70
+      },
+      "notes": "Bottom-right left room."
+    },
+    {
+      "id": "room_23",
+      "label": "room_23",
+      "confidence": 0.8,
+      "bbox": {
+        "x": 659,
+        "y": 352,
+        "width": 52,
+        "height": 70
+      },
+      "notes": "Bottom-right room."
+    },
+    {
+      "id": "room_24",
+      "label": "room_24",
+      "confidence": 0.71,
+      "bbox": {
+        "x": 711,
+        "y": 352,
+        "width": 31,
+        "height": 70
+      },
+      "notes": "Bottom-right narrow enclosed room."
+    },
+    {
+      "id": "room_25",
+      "label": "room_25",
+      "confidence": 0.8,
+      "bbox": {
+        "x": 742,
+        "y": 352,
+        "width": 59,
+        "height": 70
+      },
+      "notes": "Bottom-right right room."
+    },
+    {
+      "id": "room_26",
+      "label": "room_26",
+      "confidence": 0.64,
+      "bbox": {
+        "x": 802,
+        "y": 352,
+        "width": 31,
+        "height": 70
+      },
+      "notes": "Far bottom-right enclosed service/core room."
+    }
+  ],
+  "warnings": [
+    "Several top-left, central-core, and right-edge spaces appear to be stair/elevator/service compartments; they were kept because they are visibly enclosed, but semantic room type is uncertain.",
+    "Circulation around the atrium and open hallways was excluded; if corridor enclosures are intended as rooms, the total count would increase.",
+    "The narrow vertical space left of the atrium-side block is included with moderate confidence because its enclosing walls are weaker than the larger rooms.",
+    "Tiny internal shafts and fine restroom stall subdivisions were not extracted as separate rooms."
+  ],
+  "one_shot_example": {
+    "input": "/Users/andy/works/ai/maf-boilerplate/data/original2.png",
+    "target": "/Users/andy/works/ai/maf-boilerplate/data/target2.png"
+  }
+}

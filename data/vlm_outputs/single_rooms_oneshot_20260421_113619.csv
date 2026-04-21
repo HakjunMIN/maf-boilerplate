@@ -1,0 +1,9 @@
+id,label,confidence,x,y,width,height,notes
+room_1,room_1,0.9,79,118,136,227,Large enclosed room on the left side; separated from the lower-left service area and split from adjacent left-side enclosed area per instruction.
+room_2,room_2,0.88,216,136,342,283,Main large central room occupying most of the middle-left portion.
+room_3,room_3,0.82,345,345,212,74,Long narrow enclosed room along the bottom center; treated as a valid room due to clear enclosure.
+room_4,room_4,0.8,558,164,39,179,Additional enclosed side space immediately left of the large right-side room; counted explicitly as a separate room.
+room_5,room_5,0.91,597,161,186,155,Large enclosed room in the right-center with diagonal internal lines.
+room_6,room_6,0.76,564,352,128,31,"Narrow enclosed bottom-right room segment, separated by partitions."
+room_7,room_7,0.77,699,352,47,67,Small enclosed room at lower right-center.
+room_8,room_8,0.79,748,352,68,67,"Enclosed room at the far lower right, distinct from adjacent small room."
