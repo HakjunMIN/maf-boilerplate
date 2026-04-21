@@ -6,6 +6,11 @@
       "sourceType": "github",
       "computedHash": "56c9a059910cc97f9b8c7ffc582a979e2940363ed2bbde2fdcd9c8fb4a500ccd"
     },
+    "frontend-design": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "computedHash": "063a0e6448123cd359ad0044cc46b0e490cc7964d45ef4bb9fd842bd2ffbca67"
+    },
     "microsoft-agent-framework": {
       "source": "github/awesome-copilot",
       "sourceType": "github",
