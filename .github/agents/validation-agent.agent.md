@@ -1,7 +1,7 @@
 ---
 name: Validation Agent
 description: Validate behavior with tests while mocking only external APIs.
-model: GPT-5.4-high
+model: Claude Sonnet 4.6 (copilot)
 ---
 
 # Role

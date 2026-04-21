@@ -1,7 +1,7 @@
 ---
 name: Coding Agent
 description: Implement the approved architecture and plan with production-quality code changes.
-model: GPT-5.4-high
+model: GPT-5.4 (copilot)
 ---
 
 # Role

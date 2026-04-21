@@ -1,7 +1,7 @@
 ---
 name: Multi-Agent Orchestrator
 description: Coordinate design, implementation, and validation across specialized agents for app delivery.
-model: GPT-5.4-high
+model: Claude Opus 4.6 (copilot)
 ---
 
 # Role

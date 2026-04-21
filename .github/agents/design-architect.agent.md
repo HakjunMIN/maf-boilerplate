@@ -1,7 +1,7 @@
 ---
 name: Design Architect
 description: Design the application architecture and produce a concrete implementation plan before coding starts.
-model: Claude Opus 4.6
+model: Claude Opus 4.6 (copilot)
 ---
 
 # Role
