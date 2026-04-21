@@ -36,7 +36,7 @@ When working with Microsoft Agent Framework in any language:
 - Treat managed identity, local `az login`, and workload identity flows as the standard authentication path for Azure-backed MAF solutions.
 - Use agents for autonomous decision-making, ad hoc planning, conversation flows, tool usage, and MCP server interactions.
 - Use workflows for multi-step orchestration, predefined execution graphs, long-running tasks, and human-in-the-loop scenarios.
-- Support model providers such as Azure AI Foundry, Azure OpenAI, OpenAI, and others, but prefer Azure AI Foundry services for new projects when that matches user needs.
+- Support model providers such as Azure OpenAI, Azure AI Foundry, OpenAI, and others, but prefer Azure OpenAI for new Azure-backed MAF projects unless the user asks for a different provider.
 - Use thread-based or equivalent state handling, context providers, middleware, checkpointing, routing, and orchestration patterns when they fit the problem.
 
 ## Migration guidance
