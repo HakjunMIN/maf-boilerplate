@@ -5,7 +5,7 @@
 ## Agent Routing
 
 - 설계 에이전트: Claude Opus 4.6
-- 코딩 에이전트: GPT-5.4-high
+- 코딩 에이전트: GPT 5.4
 - 검증 에이전트: Claude Sonnet 4.6
 
 ## Agents

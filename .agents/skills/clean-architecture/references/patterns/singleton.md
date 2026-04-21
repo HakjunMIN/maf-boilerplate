@@ -6,7 +6,7 @@ The class-based Singleton pattern is an anti-pattern in Python. If you need a si
 
 ## Historical Context
 
-The Singleton pattern originated in Java/C++, where you cannot have module-level instances — everything must live in a class. Python's module system makes this unnecessary. A Python module is itself a singleton (imported once and cached by the runtime). When you see "use the Singleton pattern," in Python think "create a module-level instance" or "inject the dependency."
+The Singleton pattern originated in class-centric languages where you cannot have module-level instances and everything must live in a class. Python's module system makes this unnecessary. A Python module is itself a singleton (imported once and cached by the runtime). When you see "use the Singleton pattern," in Python think "create a module-level instance" or "inject the dependency."
 
 ---
 

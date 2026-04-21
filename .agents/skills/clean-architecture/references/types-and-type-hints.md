@@ -10,7 +10,7 @@ Python sits at a specific intersection of two independent axes: **static vs dyna
 
 This axis determines **when** type information is checked.
 
-- **Static typing** (Java, C#, Go): Types are checked at compile time. A variable declared as `int` can never hold a string. The compiler rejects the program before it runs.
+- **Static typing** (for example, in compiled statically typed languages): Types are checked at compile time. A variable declared as `int` can never hold a string. The compiler rejects the program before it runs.
 - **Dynamic typing** (Python, Ruby): Types are checked at runtime. Variables do not have types -- values do. A variable can refer to a string on one line and an integer on the next.
 
 ```python
@@ -22,14 +22,14 @@ my_var = 5
 print(my_var)  # 5 -- same variable, different type of value
 ```
 
-In Java, this reassignment would be a compile-time error. In Python, it runs without complaint because the variable is simply a name pointing to a value, and values carry their own type.
+In many statically typed languages, this reassignment would be a compile-time error. In Python, it runs without complaint because the variable is simply a name pointing to a value, and values carry their own type.
 
 ### Strong vs Weak Typing
 
 This axis determines **how strictly** types are enforced when operations combine different types.
 
-- **Strong typing** (Python, Java): No implicit type conversions. Attempting to add `5 + "hello"` raises a `TypeError`.
-- **Weak typing** (JavaScript, PHP): The language silently converts types to make operations succeed. `5 + "hello"` produces `"5hello"` in JavaScript.
+- **Strong typing**: No implicit type conversions. Attempting to add `5 + "hello"` raises a `TypeError`.
+- **Weak typing**: The language silently converts types to make operations succeed.
 
 ```python
 # Python is strongly typed: no implicit conversions.
@@ -52,10 +52,10 @@ Python checks types at runtime (dynamic) and refuses to silently convert between
 
 | Language   | Static/Dynamic | Strong/Weak |
 |------------|----------------|-------------|
-| Java, C#   | Static         | Strong      |
+| Statically typed compiled languages | Static | Strong |
 | Python     | Dynamic        | Strong      |
-| JavaScript | Dynamic        | Weak        |
-| C          | Static         | Weak        |
+| Dynamically typed weakly coercing languages | Dynamic | Weak |
+| Weakly typed compiled languages | Static | Weak |
 
 ---
 
@@ -431,7 +431,7 @@ make_sound(Robot())  # "Beep"
 | Coupling | Classes must explicitly inherit from the ABC | Classes have zero knowledge of the Protocol |
 | Flexibility | Only subclasses pass the type check | Any class with matching methods passes |
 | Enforcement | `@abstractmethod` prevents instantiation of incomplete subclasses | Type checker flags missing methods, but runtime does not enforce |
-| Python idiom | More Java/C# style | More Pythonic (duck typing) |
+| Python idiom | More class-heavy static-language style | More Pythonic (duck typing) |
 | Best for | Framework extension points where you control the hierarchy | Interfaces between decoupled components |
 
 Protocol is a good default for defining interfaces in clean architecture — it keeps components decoupled because the implementing class never imports or references the protocol definition. However, ABCs are not obsolete. Prefer ABC when shared implementation exists in the superclass (e.g., stored state that subclasses use), when you want instantiation-time error checking (`@abstractmethod` prevents incomplete subclasses), or when IDE "implement methods" assistance is valuable. See the full comparison in `design-principles.md`.

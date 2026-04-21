@@ -1,6 +1,6 @@
 ---
 name: azure-ai
-description: "Use for Azure AI: Search, Speech, OpenAI, Document Intelligence. Helps with search, vector/hybrid search, speech-to-text, text-to-speech, transcription, OCR. WHEN: AI Search, query search, vector search, hybrid search, semantic search, speech-to-text, text-to-speech, transcribe, OCR, convert text to speech."
+description: "Use for Azure AI in Python: Search, Speech, OpenAI, and Document Intelligence. Helps with search, vector or hybrid search, speech-to-text, text-to-speech, transcription, and OCR using Python-first guidance."
 license: MIT
 metadata:
   author: Microsoft
@@ -8,6 +8,11 @@ metadata:
 ---
 
 # Azure AI Services
+
+This skill is Python-only.
+
+- Use this skill for Python implementations and Python SDK usage.
+- Do not use this skill as a source of non-Python guidance.
 
 ## Services
 
@@ -55,13 +60,11 @@ When Azure MCP is enabled:
 
 For programmatic access to these services, see the condensed SDK guides:
 
-- **AI Search**: [Python](references/sdk/azure-search-documents-py.md) | [TypeScript](references/sdk/azure-search-documents-ts.md) | [.NET](references/sdk/azure-search-documents-dotnet.md)
-- **OpenAI**: [.NET](references/sdk/azure-ai-openai-dotnet.md)
-- **Vision**: [Python](references/sdk/azure-ai-vision-imageanalysis-py.md) | [Java](references/sdk/azure-ai-vision-imageanalysis-java.md)
+- **AI Search**: [Python](references/sdk/azure-search-documents-py.md)
+- **Vision**: [Python](references/sdk/azure-ai-vision-imageanalysis-py.md)
 - **Transcription**: [Python](references/sdk/azure-ai-transcription-py.md)
-- **Translation**: [Python](references/sdk/azure-ai-translation-text-py.md) | [TypeScript](references/sdk/azure-ai-translation-ts.md)
-- **Document Intelligence**: [.NET](references/sdk/azure-ai-document-intelligence-dotnet.md) | [TypeScript](references/sdk/azure-ai-document-intelligence-ts.md)
-- **Content Safety**: [Python](references/sdk/azure-ai-contentsafety-py.md) | [TypeScript](references/sdk/azure-ai-contentsafety-ts.md) | [Java](references/sdk/azure-ai-contentsafety-java.md)
+- **Translation**: [Python](references/sdk/azure-ai-translation-text-py.md)
+- **Content Safety**: [Python](references/sdk/azure-ai-contentsafety-py.md)
 
 ## Service Details
 

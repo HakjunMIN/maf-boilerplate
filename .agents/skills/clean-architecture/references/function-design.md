@@ -584,7 +584,7 @@ def compute_rental_cost(days: int, km: int, rate_per_day: float) -> float:
 
 - **You need to group related functions without shared state.** A module is simpler than a behavior-only class.
 - **Python already gives you the namespace.** `import pricing` then `pricing.compute_total()`.
-- **You want to avoid unnecessary classes.** In Python, a module with functions replaces the "static class" pattern from Java.
+- **You want to avoid unnecessary classes.** In Python, a module with functions replaces the "static class" pattern common in class-centric languages.
 
 ```python
 # pricing.py — a module that groups related functions

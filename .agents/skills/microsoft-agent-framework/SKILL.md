@@ -1,6 +1,6 @@
 ---
 name: microsoft-agent-framework
-description: 'Create, update, refactor, explain, or review Microsoft Agent Framework solutions using shared guidance plus language-specific references for .NET and Python.'
+description: 'Create, update, refactor, explain, or review Microsoft Agent Framework solutions for Python.'
 ---
 
 # Microsoft Agent Framework
@@ -9,14 +9,13 @@ Use this skill when working with applications, agents, workflows, or migrations 
 
 Microsoft Agent Framework is the unified successor to Semantic Kernel and AutoGen, combining their strengths with new capabilities. Because it is still in public preview and changes quickly, always ground implementation advice in the latest official documentation and samples rather than relying on stale knowledge.
 
-## Determine the target language first
+## Scope
 
-Choose the language workflow before making recommendations or code changes:
+This skill is Python-only.
 
-1. Use the **.NET** workflow when the repository contains `.cs`, `.csproj`, `.sln`, `.slnx`, or other .NET project files, or when the user explicitly asks for C# or .NET guidance. Follow [references/dotnet.md](references/dotnet.md).
-2. Use the **Python** workflow when the repository contains `.py`, `pyproject.toml`, `requirements.txt`, or the user explicitly asks for Python guidance. Follow [references/python.md](references/python.md).
-3. If the repository contains both ecosystems, match the language used by the files being edited or the user's stated target.
-4. If the language is ambiguous, inspect the current workspace first and then choose the closest language-specific reference.
+- Use this skill when the repository contains `.py`, `pyproject.toml`, or `requirements.txt`, or when the user explicitly asks for Python guidance.
+- Do not use this skill as a source of non-Python implementation guidance.
+- Follow [references/python.md](references/python.md) for language-specific guidance.
 
 ## Always consult live documentation
 
@@ -32,7 +31,9 @@ When working with Microsoft Agent Framework in any language:
 - Use async patterns for agent and workflow operations.
 - Implement explicit error handling and logging.
 - Prefer strong typing, clear interfaces, and maintainable composition patterns.
-- Use `DefaultAzureCredential` when Azure authentication is appropriate.
+- For Azure-hosted model providers and services, default to keyless authentication with `DefaultAzureCredential`.
+- Do not recommend or generate API-key-based authentication for Azure AI Foundry, Azure OpenAI, or other Azure-backed MAF integrations unless the user explicitly requires it.
+- Treat managed identity, local `az login`, and workload identity flows as the standard authentication path for Azure-backed MAF solutions.
 - Use agents for autonomous decision-making, ad hoc planning, conversation flows, tool usage, and MCP server interactions.
 - Use workflows for multi-step orchestration, predefined execution graphs, long-running tasks, and human-in-the-loop scenarios.
 - Support model providers such as Azure AI Foundry, Azure OpenAI, OpenAI, and others, but prefer Azure AI Foundry services for new projects when that matches user needs.
@@ -46,20 +47,19 @@ When working with Microsoft Agent Framework in any language:
 
 ## Workflow
 
-1. Determine the target language and read the matching reference file.
-2. Fetch the latest official docs and samples before making implementation choices.
+1. Confirm the task is for Python.
+2. Fetch the latest official docs and Python samples before making implementation choices.
 3. Apply the shared agent and workflow guidance from this skill.
-4. Use the language-specific package, repository, sample paths, and coding practices from the chosen reference.
+4. Use the Python package, repository path, sample paths, and coding practices from the Python reference.
 5. When examples in the repo differ from current docs, explain the difference and follow the current supported pattern.
 
 ## References
 
-- [.NET reference](references/dotnet.md)
 - [Python reference](references/python.md)
 
 ## Completion criteria
 
-- Recommendations match the target language.
-- Package names, repository paths, and sample locations match the selected ecosystem.
+- Recommendations target Python only.
+- Package names, repository paths, and sample locations match the Python ecosystem.
 - Guidance reflects current Microsoft Agent Framework documentation rather than legacy assumptions.
 - Migration advice calls out Semantic Kernel and AutoGen only when relevant.
