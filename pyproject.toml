@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling>=1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "maf-backend"
+version = "0.1.0"
+description = "Backend-only multi-agent orchestration service built with Microsoft Agent Framework"
+requires-python = ">=3.12"
+dependencies = [
+    "agent-framework>=1.1.0",
+    "azure-identity>=1.20.0,<2.0.0",
+    "duckduckgo-search>=6.3.0,<7.0.0",
+    "fastapi>=0.115.0,<1.0.0",
+    "httpx>=0.28.0,<1.0.0",
+    "pydantic>=2.11.0,<3.0.0",
+    "pydantic-settings>=2.9.0,<3.0.0",
+    "uvicorn>=0.34.0,<1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0,<10.0.0",
+    "pytest-asyncio>=1.0.0,<2.0.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]

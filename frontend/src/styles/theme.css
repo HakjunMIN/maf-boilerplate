@@ -1,0 +1,20 @@
+:root {
+  --bg-base: #0c0e12;
+  --bg-surface: rgba(19, 23, 31, 0.86);
+  --bg-elevated: rgba(24, 30, 41, 0.92);
+  --bg-inset: #0a0c10;
+  --border: rgba(112, 126, 154, 0.22);
+  --border-strong: rgba(112, 126, 154, 0.4);
+  --text-primary: #dde3ed;
+  --text-muted: #7a8799;
+  --accent-amber: #e8a838;
+  --accent-teal: #3ec9d4;
+  --accent-red: #e05252;
+  --accent-slate: #445065;
+  --shadow-panel: 0 24px 80px rgba(0, 0, 0, 0.38);
+  --shadow-soft: 0 16px 40px rgba(0, 0, 0, 0.22);
+  --radius-panel: 24px;
+  --radius-soft: 18px;
+  --font-ui: 'IBM Plex Sans', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
