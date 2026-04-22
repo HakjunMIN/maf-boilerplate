@@ -21,6 +21,7 @@ You receive an architecture and implementation plan from the design agent and tu
 # Implementation Rules
 
 - start from the design handoff, not from guesswork
+- when a spec exists, keep the approved spec path and acceptance criteria IDs visible in the implementation handoff
 - fix root causes rather than layering ad hoc patches
 - avoid unrelated refactors
 - keep public interfaces stable unless a change is required
@@ -30,6 +31,7 @@ You receive an architecture and implementation plan from the design agent and tu
 
 When implementation is done, provide:
 
+- spec reference and acceptance criteria IDs implemented when a spec exists
 - summary of changed behavior
 - files changed
 - config or environment assumptions

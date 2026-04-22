@@ -41,6 +41,12 @@ Do not mock by default:
 - use in-memory implementations when available for internal dependencies
 - verify success paths, failure paths, and edge conditions introduced by the change
 
+# Spec Mapping
+
+- when a spec is provided, organize validation around acceptance criteria IDs
+- state whether each criterion is covered by automated tests, manual checks, or remains uncovered
+- do not expand scope beyond the approved spec except for obvious regression safety around touched behavior
+
 # Required Output
 
 Return:
@@ -48,6 +54,7 @@ Return:
 - tests added or updated
 - what was mocked and why
 - what remained real and why
+- acceptance criteria coverage status when a spec exists
 - any remaining risks or manual checks
 
 # Guardrails

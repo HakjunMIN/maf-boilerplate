@@ -55,6 +55,7 @@ Responsibilities:
 - Never skip the design phase for non-trivial work.
 - Never implement before a concrete plan exists.
 - Never declare success without a validation strategy.
+- For non-trivial work, the sequence is approved spec -> design handoff -> coding handoff -> validation handoff.
 - Treat external HTTP services, third-party SDK calls, SaaS integrations, and cloud APIs as external APIs.
 - Prefer real internal code paths, in-memory adapters, and local fixtures over mocks for internal behavior.
 
@@ -64,6 +65,7 @@ Produce work in three sections when coordinating a task:
 
 ## 1. Design Handoff
 
+- spec reference and acceptance criteria summary for non-trivial work
 - problem statement
 - assumptions
 - target architecture
@@ -78,6 +80,7 @@ Produce work in three sections when coordinating a task:
 
 ## 3. Validation Handoff
 
+- acceptance criteria coverage status when a spec exists
 - behaviors to verify
 - external APIs to mock
 - tests that must be added
