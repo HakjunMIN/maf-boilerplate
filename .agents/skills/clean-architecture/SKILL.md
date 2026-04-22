@@ -1,7 +1,7 @@
 ---
-name: Python Clean Architecture
+name: clean-architecture
 description: This skill should be used when the user asks to "scaffold a FastAPI project", "set up clean architecture", "refactor to clean architecture", "add a new endpoint", "add a router", "add an operation", "add a repository", "review my code structure", "apply design patterns in Python", "decouple my code", "improve code quality", "make my code testable", or mentions layered architecture, dependency injection, Protocol-based design, or Pythonic design patterns for Python/FastAPI projects.
-version: 0.8.1
+version: 0.8.2
 ---
 
 # Python Clean Architecture
@@ -17,6 +17,15 @@ Provide Clean Architecture guidance for Python projects, specifically FastAPI AP
 - Adding new components (endpoints, operations, repositories, models)
 - Reviewing code for design quality and Pythonic idiom adherence
 - Making code testable through dependency injection and Protocol-based abstractions
+
+## Package Management Rule
+
+Use `uv` for all Python package and environment management in this skill. Treat this as a required convention, not a preference.
+
+- Create and maintain dependencies in `pyproject.toml`
+- Commit `uv.lock`
+- Use `uv add`, `uv remove`, `uv sync`, and `uv run` instead of `pip install`, ad-hoc virtualenv commands, or handwritten `requirements.txt` workflows
+- Do not introduce `requirements.txt` as the primary dependency source unless the user explicitly asks for a compatibility export
 
 ## Core Architecture: Three Layers
 
@@ -145,7 +154,8 @@ project_name/
 │   └── {entity}.py            # Pydantic Create/Read models
 ├── tests/
 │   └── test_{entity}.py       # Tests using DataInterfaceStub
-├── requirements.txt
+├── pyproject.toml
+├── uv.lock
 └── .gitignore
 ```
 
