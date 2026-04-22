@@ -1,0 +1,9 @@
+agent-framework>=1.0.0
+azure-identity>=1.22.0
+fastapi>=0.116.0
+httpx>=0.28.1
+pydantic-settings>=2.8.0
+python-dotenv>=1.1.0
+sse-starlette>=2.2.1
+tenacity>=9.1.2
+uvicorn[standard]>=0.35.0

@@ -1,0 +1,45 @@
+[project]
+name = "maf-groupchat-backend"
+version = "0.1.0"
+description = "Backend-only workflow built with Microsoft Agent Framework"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "agent-framework>=1.0.0",
+    "azure-identity>=1.22.0",
+    "fastapi>=0.116.0",
+    "httpx>=0.28.1",
+    "pydantic-settings>=2.8.0",
+    "python-dotenv>=1.1.0",
+    "sse-starlette>=2.2.1",
+    "tenacity>=9.1.2",
+    "uvicorn[standard]>=0.35.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.0",
+    "pytest-asyncio>=1.0.0",
+    "ruff>=0.15.0",
+]
+
+[build-system]
+requires = ["setuptools>=80.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
