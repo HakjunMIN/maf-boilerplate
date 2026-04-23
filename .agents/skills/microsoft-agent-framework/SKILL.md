@@ -39,12 +39,6 @@ When working with Microsoft Agent Framework in any language:
 - Support model providers such as Azure OpenAI, Azure AI Foundry, OpenAI, and others, but prefer Azure OpenAI for new Azure-backed MAF projects unless the user asks for a different provider.
 - Use thread-based or equivalent state handling, context providers, middleware, checkpointing, routing, and orchestration patterns when they fit the problem.
 
-## Migration guidance
-
-- If migrating from Semantic Kernel, use the official migration guide: <https://learn.microsoft.com/agent-framework/migration-guide/from-semantic-kernel/>
-- If migrating from AutoGen, use the official migration guide: <https://learn.microsoft.com/agent-framework/migration-guide/from-autogen/>
-- Preserve behavior first, then adopt native Agent Framework patterns incrementally.
-
 ## Workflow
 
 1. Confirm the task is for Python.
