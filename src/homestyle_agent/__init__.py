@@ -1,5 +1,6 @@
 """Agent runtime package."""
 
 from .application import GroundedQueryService
+from .infrastructure import AzureRagRuntime
 
-__all__ = ["GroundedQueryService"]
+__all__ = ["AzureRagRuntime", "GroundedQueryService"]
