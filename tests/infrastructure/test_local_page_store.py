@@ -8,6 +8,7 @@ from homestyle_ingestion.infrastructure.storage import (
     LocalPageStore,
     PageStoreNotFoundError,
     StoredPage,
+    StoredPageInventoryEntry,
 )
 
 
@@ -142,3 +143,56 @@ async def test_local_page_store_preserves_page_segments_for_vlm_provenance(tmp_p
         metadata=metadata,
         extraction_version="v2",
     )
+
+
+@pytest.mark.asyncio
+async def test_local_page_store_persists_delete_tombstones_in_inventory(tmp_path: Path) -> None:
+    store = LocalPageStore(root_directory=tmp_path)
+    url = "https://homestyle.lge.co.kr/collection/living-room"
+    metadata = FetchMetadata(
+        url=url,
+        etag='"etag-1"',
+        last_modified="Mon, 21 Apr 2026 00:00:00 GMT",
+        content_hash="hash-1",
+    )
+
+    await store.save_page(
+        ExtractedPage(
+            url=url,
+            title="거실 컬렉션",
+            breadcrumb=("collection", "living-room"),
+            markdown="# 거실 컬렉션",
+        ),
+        metadata,
+        "v2",
+    )
+    await store.mark_deleted(url, "2026-04-28T00:00:00+00:00")
+
+    assert await store.list_pages() == [
+        StoredPageInventoryEntry(
+            url=url,
+            metadata=metadata,
+            extraction_version="v2",
+            is_deleted=True,
+            deleted_at="2026-04-28T00:00:00+00:00",
+        )
+    ]
+
+    await store.save_page(
+        ExtractedPage(
+            url=url,
+            title="거실 컬렉션",
+            breadcrumb=("collection", "living-room"),
+            markdown="# 거실 컬렉션\n\n재수집됨",
+        ),
+        metadata,
+        "v3",
+    )
+
+    assert await store.list_pages() == [
+        StoredPageInventoryEntry(
+            url=url,
+            metadata=metadata,
+            extraction_version="v3",
+        )
+    ]

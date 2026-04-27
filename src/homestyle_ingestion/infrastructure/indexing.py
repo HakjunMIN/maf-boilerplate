@@ -45,11 +45,43 @@ class AzureSearchSectionIndexer:
                     "is_image_derived": section.is_image_derived,
                     "extraction_version": section.extraction_version or self._extraction_version,
                     "reviewer_approved": section.reviewer_approved,
+                    "is_deleted": False,
+                    "deleted_at": None,
                     "indexed_at": indexed_at,
                 }
             )
         if documents:
             await self._client.merge_or_upload_documents(documents)
 
+    async def soft_delete_page(self, page_url: str, deleted_at: str) -> None:
+        documents = [
+            {
+                "chunk_id": chunk_id,
+                "is_deleted": True,
+                "deleted_at": deleted_at,
+            }
+            for chunk_id in await self._list_chunk_ids(page_url)
+        ]
+        if documents:
+            await self._client.merge_documents(documents)
+
+    async def hard_delete_page(self, page_url: str) -> None:
+        documents = [{"chunk_id": chunk_id} for chunk_id in await self._list_chunk_ids(page_url)]
+        if documents:
+            await self._client.delete_documents(documents)
+
     async def close(self) -> None:
         await self._client.close()
+
+    async def _list_chunk_ids(self, page_url: str) -> list[str]:
+        escaped_page_url = page_url.replace("'", "''")
+        search_results = await self._client.search(
+            search_text="*",
+            filter=f"page_url eq '{escaped_page_url}'",
+            select=["chunk_id"],
+            top=1000,
+        )
+        chunk_ids: list[str] = []
+        async for search_result in search_results:
+            chunk_ids.append(str(search_result["chunk_id"]))
+        return chunk_ids

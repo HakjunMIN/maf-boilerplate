@@ -5,6 +5,7 @@ from .extraction import DomExtractionService
 from .fetch import ConditionalFetchService
 from .indexing import SectionSplitter
 from .ingestion import IngestionPipeline
+from .runner import PipelineRunResult, PipelineRunner
 from .vlm import VlmTriggerPolicy
 
 __all__ = [
@@ -13,6 +14,8 @@ __all__ = [
     "DiscoveryService",
     "DomExtractionService",
     "IngestionPipeline",
+    "PipelineRunResult",
+    "PipelineRunner",
     "SectionSplitter",
     "VlmTriggerPolicy",
 ]

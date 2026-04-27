@@ -18,6 +18,15 @@ class StoredPage:
     extraction_version: str
 
 
+@dataclass(frozen=True)
+class StoredPageInventoryEntry:
+    url: str
+    metadata: FetchMetadata
+    extraction_version: str
+    is_deleted: bool = False
+    deleted_at: str | None = None
+
+
 class LocalPageStore:
     def __init__(self, *, root_directory: Path) -> None:
         self._root_directory = root_directory
@@ -58,6 +67,8 @@ class LocalPageStore:
                         "fetch_failed": metadata.fetch_failed,
                     },
                     "extraction_version": extraction_version,
+                    "is_deleted": False,
+                    "deleted_at": None,
                 },
                 ensure_ascii=False,
             ),
@@ -89,16 +100,62 @@ class LocalPageStore:
                     for segment in page_payload.get("segments", [])
                 ),
             ),
-            metadata=FetchMetadata(
-                url=metadata_payload["url"],
-                etag=metadata_payload["etag"],
-                last_modified=metadata_payload["last_modified"],
-                content_hash=metadata_payload["content_hash"],
-                fetch_failed=metadata_payload["fetch_failed"],
-            ),
+            metadata=self._metadata_from_payload(metadata_payload),
             extraction_version=str(payload["extraction_version"]),
         )
+
+    async def list_pages(self) -> list[StoredPageInventoryEntry]:
+        if not self._root_directory.exists():
+            return []
+        stored_pages: list[StoredPageInventoryEntry] = []
+        for storage_path in sorted(self._root_directory.glob("*.json")):
+            payload = json.loads(storage_path.read_text(encoding="utf-8"))
+            metadata_payload = payload["metadata"]
+            stored_pages.append(
+                StoredPageInventoryEntry(
+                    url=str(metadata_payload["url"]),
+                    metadata=self._metadata_from_payload(metadata_payload),
+                    extraction_version=str(payload["extraction_version"]),
+                    is_deleted=bool(payload.get("is_deleted", False)),
+                    deleted_at=payload.get("deleted_at"),
+                )
+            )
+        return stored_pages
+
+    async def mark_deleted(self, url: str, deleted_at: str) -> None:
+        payload = self._load_payload(url)
+        payload["is_deleted"] = True
+        payload["deleted_at"] = deleted_at
+        self._write_payload(url, payload)
+
+    async def delete_page(self, url: str) -> None:
+        storage_path = self._storage_path(url)
+        if not storage_path.exists():
+            raise PageStoreNotFoundError(url)
+        storage_path.unlink()
 
     def _storage_path(self, url: str) -> Path:
         key = hashlib.sha256(url.encode("utf-8")).hexdigest()
         return self._root_directory / f"{key}.json"
+
+    def _load_payload(self, url: str) -> dict[str, object]:
+        storage_path = self._storage_path(url)
+        if not storage_path.exists():
+            raise PageStoreNotFoundError(url)
+        return json.loads(storage_path.read_text(encoding="utf-8"))
+
+    def _write_payload(self, url: str, payload: dict[str, object]) -> None:
+        self._root_directory.mkdir(parents=True, exist_ok=True)
+        self._storage_path(url).write_text(
+            json.dumps(payload, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+    def _metadata_from_payload(self, metadata_payload: dict[str, object]) -> FetchMetadata:
+        return FetchMetadata(
+            url=str(metadata_payload["url"]),
+            etag=metadata_payload["etag"],
+            last_modified=metadata_payload["last_modified"],
+            content_hash=metadata_payload["content_hash"],
+            fetch_failed=bool(metadata_payload["fetch_failed"]),
+        )
