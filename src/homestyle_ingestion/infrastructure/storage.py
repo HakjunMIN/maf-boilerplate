@@ -3,7 +3,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from homestyle_ingestion.domain.extraction import ExtractedPage
+from homestyle_ingestion.domain.extraction import ExtractedPage, ExtractedSegment
 from homestyle_ingestion.domain.fetch import FetchMetadata
 
 
@@ -38,6 +38,17 @@ class LocalPageStore:
                         "title": page.title,
                         "breadcrumb": list(page.breadcrumb),
                         "markdown": page.markdown,
+                        "segments": [
+                            {
+                                "segment_id": segment.segment_id,
+                                "markdown": segment.markdown,
+                                "source_kind": segment.source_kind,
+                                "confidence_score": segment.confidence_score,
+                                "review_state": segment.review_state,
+                                "is_image_derived": segment.is_image_derived,
+                            }
+                            for segment in page.segments
+                        ],
                     },
                     "metadata": {
                         "url": metadata.url,
@@ -66,6 +77,17 @@ class LocalPageStore:
                 title=page_payload["title"],
                 breadcrumb=tuple(page_payload["breadcrumb"]),
                 markdown=page_payload["markdown"],
+                segments=tuple(
+                    ExtractedSegment(
+                        segment_id=str(segment["segment_id"]),
+                        markdown=str(segment["markdown"]),
+                        source_kind=str(segment["source_kind"]),
+                        confidence_score=float(segment["confidence_score"]),
+                        review_state=str(segment["review_state"]),
+                        is_image_derived=bool(segment["is_image_derived"]),
+                    )
+                    for segment in page_payload.get("segments", [])
+                ),
             ),
             metadata=FetchMetadata(
                 url=metadata_payload["url"],

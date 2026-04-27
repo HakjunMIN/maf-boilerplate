@@ -6,6 +6,12 @@ class VlmExtractionError(Exception):
 
 
 @dataclass(frozen=True)
+class VlmExtraction:
+    markdown: str
+    confidence_score: float
+
+
+@dataclass(frozen=True)
 class ImageCandidate:
     width: int
     role: str | None

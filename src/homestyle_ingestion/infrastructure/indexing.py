@@ -41,9 +41,10 @@ class AzureSearchSectionIndexer:
                     "section_heading": section.section_heading,
                     "content": section.content,
                     "content_vector": await self._embed_content(section.content),
-                    "confidence_score": 1.0,
-                    "is_image_derived": False,
-                    "extraction_version": self._extraction_version,
+                    "confidence_score": section.confidence_score,
+                    "is_image_derived": section.is_image_derived,
+                    "extraction_version": section.extraction_version or self._extraction_version,
+                    "reviewer_approved": section.reviewer_approved,
                     "indexed_at": indexed_at,
                 }
             )

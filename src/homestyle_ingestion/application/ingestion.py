@@ -16,6 +16,7 @@ RenderPage = Callable[[str], Awaitable[str]]
 SavePage = Callable[[ExtractedPage, FetchMetadata, str], Awaitable[None]]
 ExtractImageCandidates = Callable[[str, str], Awaitable[tuple[ImageCandidate, ...]]]
 EnrichPage = Callable[[ExtractedPage, tuple[ImageCandidate, ...]], Awaitable[ExtractedPage]]
+EnqueueReviewItems = Callable[[ExtractedPage, str], Awaitable[None]]
 
 
 class IngestionPipeline:
@@ -28,6 +29,7 @@ class IngestionPipeline:
         save_page: SavePage | None = None,
         extract_image_candidates: ExtractImageCandidates | None = None,
         enrich_page: EnrichPage | None = None,
+        enqueue_review_items: EnqueueReviewItems | None = None,
         extraction_version: str = "v1",
         index_sections: IndexSections,
     ) -> None:
@@ -39,6 +41,7 @@ class IngestionPipeline:
         self._save_page = save_page
         self._extract_image_candidates = extract_image_candidates
         self._enrich_page = enrich_page
+        self._enqueue_review_items = enqueue_review_items
         self._extraction_version = extraction_version
         self._index_sections = index_sections
 
@@ -88,7 +91,15 @@ class IngestionPipeline:
                 page = await self._enrich_page(page, image_candidates)
             if self._save_page is not None:
                 await self._save_page(page, fetch_result.metadata, self._extraction_version)
-            sections.extend(self._section_splitter.split(page=page, locale=discovered_url.locale))
+            if self._enqueue_review_items is not None:
+                await self._enqueue_review_items(page, self._extraction_version)
+            sections.extend(
+                self._section_splitter.split(
+                    page=page,
+                    locale=discovered_url.locale,
+                    extraction_version=self._extraction_version,
+                )
+            )
 
         if sections:
             await self._index_sections(sections)

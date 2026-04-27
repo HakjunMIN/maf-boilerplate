@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from homestyle_ingestion.domain.extraction import ExtractedPage
+from homestyle_ingestion.domain.extraction import ExtractedPage, ExtractedSegment
 from homestyle_ingestion.domain.fetch import FetchMetadata
 from homestyle_ingestion.infrastructure.storage import (
     LocalPageStore,
@@ -103,3 +103,42 @@ async def test_local_page_store_raises_explicit_error_for_missing_url(tmp_path: 
 
     with pytest.raises(PageStoreNotFoundError, match=missing_url):
         await store.load_page(missing_url)
+
+
+@pytest.mark.asyncio
+async def test_local_page_store_preserves_page_segments_for_vlm_provenance(tmp_path: Path) -> None:
+    store = LocalPageStore(root_directory=tmp_path)
+    page = ExtractedPage(
+        url="https://homestyle.lge.co.kr/collection/living-room",
+        title="거실 컬렉션",
+        breadcrumb=("collection", "living-room"),
+        markdown="# 거실 컬렉션\n\n짧은 본문",
+        segments=(
+            ExtractedSegment(
+                segment_id="https://homestyle.lge.co.kr/collection/living-room#dom-1",
+                markdown="# 거실 컬렉션\n\n짧은 본문",
+            ),
+            ExtractedSegment(
+                segment_id="https://homestyle.lge.co.kr/collection/living-room#vlm-1",
+                markdown="## 이미지 설명\n\n패브릭 소파 조합입니다.",
+                source_kind="vlm",
+                confidence_score=0.82,
+                review_state="not_required",
+                is_image_derived=True,
+            ),
+        ),
+    )
+    metadata = FetchMetadata(
+        url=page.url,
+        etag='"etag-1"',
+        last_modified="Mon, 21 Apr 2026 00:00:00 GMT",
+        content_hash="hash-1",
+    )
+
+    await store.save_page(page, metadata, "v2")
+
+    assert await store.load_page(page.url) == StoredPage(
+        page=page,
+        metadata=metadata,
+        extraction_version="v2",
+    )
