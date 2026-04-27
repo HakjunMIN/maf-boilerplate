@@ -1,0 +1,12 @@
+[discovery]
+locale = "ko"
+allowed_hosts = ["homestyle.lge.co.kr"]
+allowed_url_prefixes = [
+    "/home",
+    "/collection",
+    "/brand",
+    "/event",
+    "/interior",
+    "/shop?",
+]
+
