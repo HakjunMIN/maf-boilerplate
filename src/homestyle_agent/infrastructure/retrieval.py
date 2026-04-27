@@ -47,6 +47,10 @@ class AzureSearchSectionRetriever:
                 "breadcrumb",
                 "section_heading",
                 "content",
+                "confidence_score",
+                "is_image_derived",
+                "extraction_version",
+                "reviewer_approved",
             ],
         )
 
@@ -59,8 +63,21 @@ class AzureSearchSectionRetriever:
                     locale=str(result["locale"]),
                     title=str(result["title"]),
                     breadcrumb=_normalize_breadcrumb(result.get("breadcrumb")),
-                    section_heading=str(result.get("section_heading", "")),
+                    section_heading=_normalize_text(result.get("section_heading")),
                     content=str(result["content"]),
+                    confidence_score=_normalize_float(result.get("confidence_score"), default=1.0),
+                    is_image_derived=_normalize_bool(
+                        result.get("is_image_derived"),
+                        default=False,
+                    ),
+                    extraction_version=_normalize_text(
+                        result.get("extraction_version"),
+                        default="v1",
+                    ),
+                    reviewer_approved=_normalize_bool(
+                        result.get("reviewer_approved"),
+                        default=False,
+                    ),
                 )
             )
         return sections
@@ -75,3 +92,32 @@ def _normalize_breadcrumb(value: object) -> tuple[str, ...]:
     if isinstance(value, Sequence):
         return tuple(str(item) for item in value if isinstance(item, str) and item)
     return ()
+
+
+def _normalize_text(value: object, *, default: str = "") -> str:
+    if value is None:
+        return default
+    return str(value)
+
+
+def _normalize_bool(value: object, *, default: bool) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    return default
+
+
+def _normalize_float(value: object, *, default: float) -> float:
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return float(value)
+    if isinstance(value, str):
+        try:
+            return float(value)
+        except ValueError:
+            return default
+    return default
