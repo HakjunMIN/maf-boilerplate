@@ -5,6 +5,7 @@ from homestyle_ingestion.application.discovery import DiscoveryService, FetchTex
 from homestyle_ingestion.application.extraction import DomExtractionService
 from homestyle_ingestion.application.fetch import ConditionalFetchService, FetchPage
 from homestyle_ingestion.application.indexing import SectionSplitter
+from homestyle_ingestion.domain.discovery import DiscoveredUrl
 from homestyle_ingestion.domain.extraction import ExtractedPage
 from homestyle_ingestion.domain.fetch import FetchMetadata
 from homestyle_ingestion.domain.rendering import RenderPageError
@@ -56,7 +57,17 @@ class IngestionPipeline:
             sitemap_index_url=sitemap_index_url,
             config_path=config_path,
         )
+        return await self.run_discovered(
+            discovered_urls=discovered_urls,
+            previous_metadata_by_url=previous_metadata_by_url,
+        )
 
+    async def run_discovered(
+        self,
+        *,
+        discovered_urls: list[DiscoveredUrl],
+        previous_metadata_by_url: Mapping[str, FetchMetadata],
+    ) -> list[SectionDocument]:
         sections: list[SectionDocument] = []
         for discovered_url in discovered_urls:
             previous_metadata = previous_metadata_by_url.get(
