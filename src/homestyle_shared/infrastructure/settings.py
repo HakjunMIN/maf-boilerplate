@@ -16,6 +16,8 @@ class AzureRagSettings:
     managed_identity_client_id: str | None = None
     search_top: int = 5
     extraction_version: str = "v1"
+    log_level: str = "INFO"
+    application_insights_connection_string: str | None = None
 
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> "AzureRagSettings":
@@ -47,6 +49,11 @@ class AzureRagSettings:
             managed_identity_client_id=_read_optional(values, "MANAGED_IDENTITY_CLIENT_ID"),
             search_top=_read_int(values, "SEARCH_TOP", default=5),
             extraction_version=_read_optional(values, "EXTRACTION_VERSION") or "v1",
+            log_level=_read_optional(values, "LOG_LEVEL") or "INFO",
+            application_insights_connection_string=_read_optional(
+                values,
+                "APPLICATION_INSIGHTS_CONNECTION_STRING",
+            ),
         )
 
 

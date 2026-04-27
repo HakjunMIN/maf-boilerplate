@@ -223,6 +223,81 @@ async def test_pipeline_runner_soft_deletes_missing_pages_and_persists_tombstone
 
 
 @pytest.mark.asyncio
+async def test_pipeline_runner_logs_structured_metrics_with_correlation_id(tmp_path: Path) -> None:
+    events: list[tuple[str, dict[str, object]]] = []
+    discovered_url = DiscoveredUrl(
+        url="https://homestyle.lge.co.kr/collection/living-room",
+        locale="ko",
+        lastmod=None,
+        source_sitemap_url="https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml",
+    )
+
+    class FakeLogger:
+        def __init__(self, bound_values: dict[str, object] | None = None) -> None:
+            self._bound_values = bound_values or {}
+
+        def bind(self, **new_values: object) -> "FakeLogger":
+            return FakeLogger({**self._bound_values, **new_values})
+
+        def info(self, event: str, **event_kw: object) -> object:
+            events.append((event, {**self._bound_values, **event_kw}))
+            return None
+
+    async def discover_urls(_: str, __: Path) -> list[DiscoveredUrl]:
+        return [discovered_url]
+
+    async def run_ingestion(
+        *,
+        discovered_urls: list[DiscoveredUrl],
+        previous_metadata_by_url: dict[str, FetchMetadata],
+    ) -> list[SectionDocument]:
+        assert discovered_urls == [discovered_url]
+        assert previous_metadata_by_url == {}
+        return []
+
+    async def list_stored_pages() -> list[object]:
+        return []
+
+    runner = PipelineRunner(
+        discover_urls=discover_urls,
+        run_ingestion=run_ingestion,
+        list_stored_pages=list_stored_pages,
+        mark_deleted=noop_mark_deleted,
+        delete_page=noop_delete_page,
+        soft_delete_page=noop_mark_deleted,
+        hard_delete_page=noop_delete_page,
+        logger=FakeLogger(),
+    )
+
+    await runner.run(
+        sitemap_index_url="https://static-store.lge.co.kr/sitemap/sitemap.xml",
+        config_path=build_config(tmp_path),
+        mode="full",
+        correlation_id="corr-456",
+    )
+
+    assert events == [
+        (
+            "pipeline_run_completed",
+            {
+                "correlation_id": "corr-456",
+                "mode": "full",
+                "pages_discovered": 1,
+                "pages_crawled": 1,
+                "pages_changed": 0,
+                "pages_unchanged": 0,
+                "pages_failed": 0,
+                "vlm_calls": 0,
+                "vlm_failures": 0,
+                "vlm_low_confidence_count": 0,
+                "index_docs_upserted": 0,
+                "index_docs_deleted": 0,
+            },
+        )
+    ]
+
+
+@pytest.mark.asyncio
 async def test_pipeline_runner_hard_deletes_pages_after_grace_period(tmp_path: Path) -> None:
     store = LocalPageStore(root_directory=tmp_path / "pages")
     missing_url = "https://homestyle.lge.co.kr/collection/missing-page"

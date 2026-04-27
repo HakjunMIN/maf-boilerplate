@@ -1,5 +1,6 @@
 import pytest
 
+from homestyle_agent.application.grounded_query import GroundedQueryService
 from homestyle_agent import AzureRagRuntime
 from homestyle_shared.domain import SectionDocument
 from homestyle_shared.infrastructure import AzureRagSettings
@@ -146,3 +147,118 @@ async def test_azure_rag_runtime_answers_and_closes_via_public_seam(
     await runtime.close()
 
     assert close_events == ["retriever", "embedder", "credential"]
+
+
+@pytest.mark.asyncio
+async def test_azure_rag_runtime_logs_with_correlation_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    events: list[tuple[str, dict[str, object]]] = []
+
+    class FakeLogger:
+        def __init__(self, bound_values: dict[str, object] | None = None) -> None:
+            self._bound_values = bound_values or {}
+
+        def bind(self, **new_values: object) -> "FakeLogger":
+            return FakeLogger({**self._bound_values, **new_values})
+
+        def info(self, event: str, **event_kw: object) -> object:
+            events.append((event, {**self._bound_values, **event_kw}))
+            return None
+
+    class FakeCredential:
+        pass
+
+    class FakeEmbedder:
+        def __init__(self, *, endpoint: str, deployment: str, credential: object) -> None:
+            return None
+
+        async def embed_text(self, text: str) -> list[float]:
+            return [0.1, float(len(text))]
+
+        async def close(self) -> None:
+            return None
+
+    class FakeRetriever:
+        def __init__(
+            self,
+            *,
+            endpoint: str,
+            index_name: str,
+            credential: object,
+            embed_query: object,
+            top: int,
+        ) -> None:
+            return None
+
+        async def retrieve_sections(self, _: str) -> list[SectionDocument]:
+            return []
+
+        async def close(self) -> None:
+            return None
+
+    class FakeGenerator:
+        def __init__(
+            self,
+            *,
+            endpoint: str,
+            model: str,
+            credential: object,
+            api_version: str,
+        ) -> None:
+            return None
+
+        async def generate_grounded_body(
+            self,
+            question: str,
+            sections: list[SectionDocument],
+        ) -> str:
+            return ""
+
+    monkeypatch.setattr(
+        "homestyle_agent.infrastructure.runtime.build_azure_credential",
+        lambda **_: FakeCredential(),
+    )
+    monkeypatch.setattr(
+        "homestyle_agent.infrastructure.runtime.AzureOpenAIEmbedder",
+        FakeEmbedder,
+    )
+    monkeypatch.setattr(
+        "homestyle_agent.infrastructure.runtime.AzureSearchSectionRetriever",
+        FakeRetriever,
+    )
+    monkeypatch.setattr(
+        "homestyle_agent.infrastructure.runtime.MafGroundedBodyGenerator",
+        FakeGenerator,
+    )
+
+    settings = AzureRagSettings(
+        azure_openai_endpoint="https://openai.example",
+        azure_openai_api_version="2025-07-01-preview",
+        azure_openai_chat_deployment="chat-deployment",
+        azure_openai_embedding_deployment="embedding-deployment",
+        azure_openai_vision_deployment="vision-deployment",
+        azure_search_endpoint="https://search.example",
+        azure_search_index_name="sections",
+    )
+    runtime = AzureRagRuntime(settings, logger=FakeLogger())
+
+    async def retrieve_sections(_: str) -> list[SectionDocument]:
+        return []
+
+    async def generate_grounded_body(_: str, __: list[SectionDocument]) -> str:
+        return ""
+
+    runtime.grounded_query_service = GroundedQueryService(
+        retrieve_sections=retrieve_sections,
+        generate_grounded_body=generate_grounded_body,
+    )
+
+    answer = await runtime.answer("거실 스타일링을 알려줘", correlation_id="corr-123")
+
+    assert answer == "현재 수집된 LG 홈스타일 콘텐츠에서 해당 정보를 찾을 수 없습니다."
+    assert events == [
+        (
+            "grounded_answer_started",
+            {"correlation_id": "corr-123", "question_length": len("거실 스타일링을 알려줘")},
+        ),
+        ("grounded_answer_completed", {"correlation_id": "corr-123", "answer_length": len(answer)}),
+    ]

@@ -17,6 +17,8 @@ def test_azure_rag_settings_from_env_loads_required_and_optional_values() -> Non
             "MANAGED_IDENTITY_CLIENT_ID": "client-id",
             "SEARCH_TOP": "7",
             "EXTRACTION_VERSION": "v2",
+            "LOG_LEVEL": "DEBUG",
+            "APPLICATION_INSIGHTS_CONNECTION_STRING": "InstrumentationKey=test",
         }
     )
 
@@ -32,6 +34,8 @@ def test_azure_rag_settings_from_env_loads_required_and_optional_values() -> Non
         managed_identity_client_id="client-id",
         search_top=7,
         extraction_version="v2",
+        log_level="DEBUG",
+        application_insights_connection_string="InstrumentationKey=test",
     )
 
 
@@ -53,6 +57,8 @@ def test_azure_rag_settings_from_env_reads_process_environment(
     assert settings.managed_identity_client_id is None
     assert settings.search_top == 5
     assert settings.extraction_version == "v1"
+    assert settings.log_level == "INFO"
+    assert settings.application_insights_connection_string is None
 
 
 @pytest.mark.parametrize(

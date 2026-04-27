@@ -11,6 +11,10 @@ class PageStoreNotFoundError(Exception):
     pass
 
 
+class PageSegmentNotFoundError(Exception):
+    pass
+
+
 @dataclass(frozen=True)
 class StoredPage:
     page: ExtractedPage
@@ -133,6 +137,16 @@ class LocalPageStore:
         if not storage_path.exists():
             raise PageStoreNotFoundError(url)
         storage_path.unlink()
+
+    async def mark_segment_reviewed(self, url: str, segment_id: str) -> None:
+        payload = self._load_payload(url)
+        segments = payload["page"].get("segments", [])
+        for segment in segments:
+            if segment["segment_id"] == segment_id:
+                segment["review_state"] = "approved"
+                self._write_payload(url, payload)
+                return
+        raise PageSegmentNotFoundError(segment_id)
 
     def _storage_path(self, url: str) -> Path:
         key = hashlib.sha256(url.encode("utf-8")).hexdigest()

@@ -4,16 +4,27 @@ from homestyle_agent.application.grounded_query import GroundedQueryService
 from homestyle_agent.infrastructure.maf import MafGroundedBodyGenerator
 from homestyle_agent.infrastructure.retrieval import AzureSearchSectionRetriever
 from homestyle_shared.infrastructure.azure_identity import build_azure_credential
+from homestyle_shared.infrastructure.observability import (
+    StructuredLogger,
+    bind_correlation_id,
+    build_logger,
+)
 from homestyle_shared.infrastructure.openai import AzureOpenAIEmbedder
 from homestyle_shared.infrastructure.settings import AzureRagSettings
 
 
 class AzureRagRuntime:
-    def __init__(self, settings: AzureRagSettings) -> None:
+    def __init__(
+        self,
+        settings: AzureRagSettings,
+        *,
+        logger: StructuredLogger | None = None,
+    ) -> None:
         self._credential = build_azure_credential(
             use_developer_credentials=settings.use_developer_credentials,
             managed_identity_client_id=settings.managed_identity_client_id,
         )
+        self._logger = logger or build_logger("azure_rag_runtime")
         self._embedder = AzureOpenAIEmbedder(
             endpoint=settings.azure_openai_endpoint,
             deployment=settings.azure_openai_embedding_deployment,
@@ -37,8 +48,12 @@ class AzureRagRuntime:
             generate_grounded_body=self.answer_generator.generate_grounded_body,
         )
 
-    async def answer(self, question: str) -> str:
-        return await self.grounded_query_service.answer(question)
+    async def answer(self, question: str, *, correlation_id: str | None = None) -> str:
+        logger, _ = bind_correlation_id(self._logger, correlation_id)
+        logger.info("grounded_answer_started", question_length=len(question))
+        answer = await self.grounded_query_service.answer(question)
+        logger.info("grounded_answer_completed", answer_length=len(answer))
+        return answer
 
     async def close(self) -> None:
         await self.retriever.close()

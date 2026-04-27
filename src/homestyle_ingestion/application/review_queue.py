@@ -4,6 +4,8 @@ from homestyle_ingestion.domain.extraction import ExtractedPage
 from homestyle_ingestion.domain.review_queue import ReviewQueueItem
 
 EnqueueItems = Callable[[list[ReviewQueueItem]], Awaitable[None]]
+MarkApproved = Callable[[str], Awaitable[None]]
+MarkSegmentReviewed = Callable[[str, str], Awaitable[None]]
 
 
 class ReviewQueueService:
@@ -30,3 +32,18 @@ class ReviewQueueService:
         ]
         if items:
             await self._enqueue_items(items)
+
+
+class ReviewQueueApprovalService:
+    def __init__(
+        self,
+        *,
+        mark_approved: MarkApproved,
+        mark_segment_reviewed: MarkSegmentReviewed,
+    ) -> None:
+        self._mark_approved = mark_approved
+        self._mark_segment_reviewed = mark_segment_reviewed
+
+    async def approve(self, item: ReviewQueueItem) -> None:
+        await self._mark_approved(item.item_id)
+        await self._mark_segment_reviewed(item.page_url, item.segment_id)
