@@ -3,6 +3,28 @@ from playwright.async_api import Browser, Error, Page, Playwright, TimeoutError,
 from homestyle_ingestion.domain.rendering import RenderPageError
 
 
+async def _expand_collapsed_sections(page: Page, pause_ms: int = 800) -> int:
+    selectors = [
+        "text=상품정보 더보기",
+        "text=더보기",
+        "button:has-text('더보기')",
+        "a:has-text('더보기')",
+        "[class*='more']:has-text('더보기')",
+    ]
+    clicked = 0
+    for selector in selectors:
+        elements = await page.query_selector_all(selector)
+        for element in elements:
+            if await element.is_visible():
+                try:
+                    await element.click(timeout=5_000)
+                    clicked += 1
+                    await page.wait_for_timeout(pause_ms)
+                except Exception:
+                    pass
+    return clicked
+
+
 class PlaywrightPageRenderer:
     def __init__(
         self,
@@ -19,6 +41,7 @@ class PlaywrightPageRenderer:
         page = await self._new_page()
         try:
             await page.goto(url, wait_until="networkidle")
+            await _expand_collapsed_sections(page)
             return await page.content()
         except TimeoutError as error:
             raise RenderPageError(f"Timed out rendering page: {url}") from error
