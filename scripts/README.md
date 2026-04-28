@@ -50,25 +50,6 @@ MANAGED_IDENTITY_CLIENT_ID=
 AZURE_SEARCH_ADMIN_KEY=<admin-key>
 ```
 
-### AZURE_SEARCH_ADMIN_KEY 발급
-
-```bash
-az search admin-key show \
-  --service-name <service-name> \
-  --resource-group <resource-group> \
-  --query primaryKey -o tsv
-```
-
-> RBAC 대안: 현재 사용자에게 `Search Index Data Contributor` 역할을 할당하면 Admin Key 없이도 동작한다.
->
-> ```bash
-> az role assignment create \
->   --assignee $(az ad signed-in-user show --query id -o tsv) \
->   --role "Search Index Data Contributor" \
->   --scope /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.Search/searchServices/<service>
-> ```
-> RBAC 전파에 최대 5분 소요.
-
 ---
 
 ## 실행
