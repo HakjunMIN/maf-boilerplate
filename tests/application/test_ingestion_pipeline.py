@@ -17,7 +17,6 @@ def write_config(tmp_path: Path) -> Path:
                 "[discovery]",
                 'locale = "ko"',
                 'allowed_hosts = ["homestyle.lge.co.kr"]',
-                'allowed_url_prefixes = ["/collection"]',
             ]
         ),
         encoding="utf-8",
@@ -31,14 +30,14 @@ async def test_ingestion_pipeline_discovers_fetches_extracts_splits_and_indexes(
         "https://static-store.lge.co.kr/sitemap/sitemap.xml": """
             <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <sitemap>
-                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml</loc>
+                                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_product.xml</loc>
               </sitemap>
             </sitemapindex>
         """,
-        "https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml": """
+                "https://homestyle.lge.co.kr/sitemap/sitemap_product.xml": """
             <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <url>
-                <loc>https://homestyle.lge.co.kr/collection/living-room</loc>
+                                <loc>https://homestyle.lge.co.kr/item?productId=G25070000210</loc>
               </url>
             </urlset>
         """,
@@ -49,7 +48,7 @@ async def test_ingestion_pipeline_discovers_fetches_extracts_splits_and_indexes(
         return text_responses[url]
 
     async def fetch_page(url: str, headers: dict[str, str]) -> FetchResponse:
-        assert url == "https://homestyle.lge.co.kr/collection/living-room"
+        assert url == "https://homestyle.lge.co.kr/item?productId=G25070000210"
         assert headers == {}
         return FetchResponse(
             status_code=200,
@@ -83,8 +82,8 @@ async def test_ingestion_pipeline_discovers_fetches_extracts_splits_and_indexes(
         sitemap_index_url="https://static-store.lge.co.kr/sitemap/sitemap.xml",
         config_path=write_config(tmp_path),
         previous_metadata_by_url={
-            "https://homestyle.lge.co.kr/collection/living-room": FetchMetadata(
-                url="https://homestyle.lge.co.kr/collection/living-room",
+            "https://homestyle.lge.co.kr/item?productId=G25070000210": FetchMetadata(
+                url="https://homestyle.lge.co.kr/item?productId=G25070000210",
                 etag=None,
                 last_modified=None,
                 content_hash=None,
@@ -94,11 +93,11 @@ async def test_ingestion_pipeline_discovers_fetches_extracts_splits_and_indexes(
 
     assert sections == [
         SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/collection/living-room#section-1",
-            page_url="https://homestyle.lge.co.kr/collection/living-room",
+            chunk_id="https://homestyle.lge.co.kr/item?productId=G25070000210#section-1",
+            page_url="https://homestyle.lge.co.kr/item?productId=G25070000210",
             locale="ko",
             title="거실 컬렉션",
-            breadcrumb=("collection", "living-room"),
+            breadcrumb=(),
             section_heading="거실 제안",
             content="## 거실 제안\n\n밝은 톤의 거실 스타일링입니다.",
         )
@@ -114,14 +113,14 @@ async def test_ingestion_pipeline_persists_extracted_page_markdown_with_fetch_me
         "https://static-store.lge.co.kr/sitemap/sitemap.xml": """
             <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <sitemap>
-                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml</loc>
+                                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_product.xml</loc>
               </sitemap>
             </sitemapindex>
         """,
-        "https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml": """
+                "https://homestyle.lge.co.kr/sitemap/sitemap_product.xml": """
             <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <url>
-                <loc>https://homestyle.lge.co.kr/collection/living-room</loc>
+                                <loc>https://homestyle.lge.co.kr/item?productId=G25070000210</loc>
               </url>
             </urlset>
         """,
@@ -132,7 +131,7 @@ async def test_ingestion_pipeline_persists_extracted_page_markdown_with_fetch_me
         return text_responses[url]
 
     async def fetch_page(url: str, headers: dict[str, str]) -> FetchResponse:
-        assert url == "https://homestyle.lge.co.kr/collection/living-room"
+        assert url == "https://homestyle.lge.co.kr/item?productId=G25070000210"
         assert headers == {}
         return FetchResponse(
             status_code=200,
@@ -169,8 +168,8 @@ async def test_ingestion_pipeline_persists_extracted_page_markdown_with_fetch_me
         sitemap_index_url="https://static-store.lge.co.kr/sitemap/sitemap.xml",
         config_path=write_config(tmp_path),
         previous_metadata_by_url={
-            "https://homestyle.lge.co.kr/collection/living-room": FetchMetadata(
-                url="https://homestyle.lge.co.kr/collection/living-room",
+            "https://homestyle.lge.co.kr/item?productId=G25070000210": FetchMetadata(
+                url="https://homestyle.lge.co.kr/item?productId=G25070000210",
                 etag=None,
                 last_modified=None,
                 content_hash=None,
@@ -181,13 +180,13 @@ async def test_ingestion_pipeline_persists_extracted_page_markdown_with_fetch_me
     assert saved_pages == [
         (
             ExtractedPage(
-                url="https://homestyle.lge.co.kr/collection/living-room",
+                url="https://homestyle.lge.co.kr/item?productId=G25070000210",
                 title="거실 컬렉션",
-                breadcrumb=("collection", "living-room"),
+                breadcrumb=(),
                 markdown="# 거실 컬렉션\n\n## 거실 제안\n\n밝은 톤의 거실 스타일링입니다.",
             ),
             FetchMetadata(
-                url="https://homestyle.lge.co.kr/collection/living-room",
+                url="https://homestyle.lge.co.kr/item?productId=G25070000210",
                 etag='"etag-1"',
                 last_modified="Mon, 21 Apr 2026 00:00:00 GMT",
                 content_hash=None,
@@ -204,14 +203,14 @@ async def test_ingestion_pipeline_uses_rendered_html_for_dom_extraction(tmp_path
         "https://static-store.lge.co.kr/sitemap/sitemap.xml": """
             <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <sitemap>
-                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml</loc>
+                                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_product.xml</loc>
               </sitemap>
             </sitemapindex>
         """,
-        "https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml": """
+                "https://homestyle.lge.co.kr/sitemap/sitemap_product.xml": """
             <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <url>
-                <loc>https://homestyle.lge.co.kr/collection/living-room</loc>
+                                <loc>https://homestyle.lge.co.kr/item?productId=G25070000210</loc>
               </url>
             </urlset>
         """,
@@ -223,7 +222,7 @@ async def test_ingestion_pipeline_uses_rendered_html_for_dom_extraction(tmp_path
         return text_responses[url]
 
     async def fetch_page(url: str, headers: dict[str, str]) -> FetchResponse:
-        assert url == "https://homestyle.lge.co.kr/collection/living-room"
+        assert url == "https://homestyle.lge.co.kr/item?productId=G25070000210"
         assert headers == {}
         return FetchResponse(
             status_code=200,
@@ -268,8 +267,8 @@ async def test_ingestion_pipeline_uses_rendered_html_for_dom_extraction(tmp_path
         sitemap_index_url="https://static-store.lge.co.kr/sitemap/sitemap.xml",
         config_path=write_config(tmp_path),
         previous_metadata_by_url={
-            "https://homestyle.lge.co.kr/collection/living-room": FetchMetadata(
-                url="https://homestyle.lge.co.kr/collection/living-room",
+            "https://homestyle.lge.co.kr/item?productId=G25070000210": FetchMetadata(
+                url="https://homestyle.lge.co.kr/item?productId=G25070000210",
                 etag=None,
                 last_modified=None,
                 content_hash=None,
@@ -277,14 +276,14 @@ async def test_ingestion_pipeline_uses_rendered_html_for_dom_extraction(tmp_path
         },
     )
 
-    assert rendered_urls == ["https://homestyle.lge.co.kr/collection/living-room"]
+    assert rendered_urls == ["https://homestyle.lge.co.kr/item?productId=G25070000210"]
     assert sections == [
         SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/collection/living-room#section-1",
-            page_url="https://homestyle.lge.co.kr/collection/living-room",
+            chunk_id="https://homestyle.lge.co.kr/item?productId=G25070000210#section-1",
+            page_url="https://homestyle.lge.co.kr/item?productId=G25070000210",
             locale="ko",
             title="렌더된 거실 컬렉션",
-            breadcrumb=("collection", "living-room"),
+            breadcrumb=(),
             section_heading="거실 제안",
             content="## 거실 제안\n\n렌더된 본문입니다.",
         )
@@ -302,17 +301,17 @@ async def test_ingestion_pipeline_skips_page_when_renderer_fails_and_continues(
         "https://static-store.lge.co.kr/sitemap/sitemap.xml": """
             <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <sitemap>
-                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml</loc>
+                                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_product.xml</loc>
               </sitemap>
             </sitemapindex>
         """,
-        "https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml": """
+                "https://homestyle.lge.co.kr/sitemap/sitemap_product.xml": """
             <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <url>
-                <loc>https://homestyle.lge.co.kr/collection/failing-page</loc>
+                                <loc>https://homestyle.lge.co.kr/item?productId=G25070000998</loc>
               </url>
               <url>
-                <loc>https://homestyle.lge.co.kr/collection/success-page</loc>
+                                <loc>https://homestyle.lge.co.kr/item?productId=G25070000999</loc>
               </url>
             </urlset>
         """,
@@ -332,7 +331,7 @@ async def test_ingestion_pipeline_skips_page_when_renderer_fails_and_continues(
         )
 
     async def render_page(url: str) -> str:
-        if url.endswith("/failing-page"):
+        if "G25070000998" in url:
             raise RenderPageError("render failed")
         return """
             <html>
@@ -360,14 +359,14 @@ async def test_ingestion_pipeline_skips_page_when_renderer_fails_and_continues(
         sitemap_index_url="https://static-store.lge.co.kr/sitemap/sitemap.xml",
         config_path=write_config(tmp_path),
         previous_metadata_by_url={
-            "https://homestyle.lge.co.kr/collection/failing-page": FetchMetadata(
-                url="https://homestyle.lge.co.kr/collection/failing-page",
+            "https://homestyle.lge.co.kr/item?productId=G25070000998": FetchMetadata(
+                url="https://homestyle.lge.co.kr/item?productId=G25070000998",
                 etag=None,
                 last_modified=None,
                 content_hash=None,
             ),
-            "https://homestyle.lge.co.kr/collection/success-page": FetchMetadata(
-                url="https://homestyle.lge.co.kr/collection/success-page",
+            "https://homestyle.lge.co.kr/item?productId=G25070000999": FetchMetadata(
+                url="https://homestyle.lge.co.kr/item?productId=G25070000999",
                 etag=None,
                 last_modified=None,
                 content_hash=None,
@@ -377,11 +376,11 @@ async def test_ingestion_pipeline_skips_page_when_renderer_fails_and_continues(
 
     assert sections == [
         SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/collection/success-page#section-1",
-            page_url="https://homestyle.lge.co.kr/collection/success-page",
+            chunk_id="https://homestyle.lge.co.kr/item?productId=G25070000999#section-1",
+            page_url="https://homestyle.lge.co.kr/item?productId=G25070000999",
             locale="ko",
             title="성공한 페이지",
-            breadcrumb=("collection", "success-page"),
+            breadcrumb=(),
             section_heading="거실 제안",
             content="## 거실 제안\n\n성공한 렌더 본문입니다.",
         )
@@ -397,14 +396,14 @@ async def test_ingestion_pipeline_enriches_page_with_vlm_before_section_splittin
         "https://static-store.lge.co.kr/sitemap/sitemap.xml": """
             <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <sitemap>
-                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml</loc>
+                                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_product.xml</loc>
               </sitemap>
             </sitemapindex>
         """,
-        "https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml": """
+                "https://homestyle.lge.co.kr/sitemap/sitemap_product.xml": """
             <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <url>
-                <loc>https://homestyle.lge.co.kr/collection/living-room</loc>
+                                <loc>https://homestyle.lge.co.kr/item?productId=G25070000210</loc>
               </url>
             </urlset>
         """,
@@ -416,7 +415,7 @@ async def test_ingestion_pipeline_enriches_page_with_vlm_before_section_splittin
         return text_responses[url]
 
     async def fetch_page(url: str, headers: dict[str, str]) -> FetchResponse:
-        assert url == "https://homestyle.lge.co.kr/collection/living-room"
+        assert url == "https://homestyle.lge.co.kr/item?productId=G25070000210"
         assert headers == {}
         return FetchResponse(
             status_code=200,
@@ -462,8 +461,8 @@ async def test_ingestion_pipeline_enriches_page_with_vlm_before_section_splittin
         sitemap_index_url="https://static-store.lge.co.kr/sitemap/sitemap.xml",
         config_path=write_config(tmp_path),
         previous_metadata_by_url={
-            "https://homestyle.lge.co.kr/collection/living-room": FetchMetadata(
-                url="https://homestyle.lge.co.kr/collection/living-room",
+            "https://homestyle.lge.co.kr/item?productId=G25070000210": FetchMetadata(
+                url="https://homestyle.lge.co.kr/item?productId=G25070000210",
                 etag=None,
                 last_modified=None,
                 content_hash=None,
@@ -476,20 +475,20 @@ async def test_ingestion_pipeline_enriches_page_with_vlm_before_section_splittin
     ]
     assert sections == [
         SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/collection/living-room#section-1",
-            page_url="https://homestyle.lge.co.kr/collection/living-room",
+            chunk_id="https://homestyle.lge.co.kr/item?productId=G25070000210#section-1",
+            page_url="https://homestyle.lge.co.kr/item?productId=G25070000210",
             locale="ko",
             title="거실 컬렉션",
-            breadcrumb=("collection", "living-room"),
+            breadcrumb=(),
             section_heading="거실 제안",
             content="## 거실 제안\n\n짧은 본문",
         ),
         SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/collection/living-room#section-2",
-            page_url="https://homestyle.lge.co.kr/collection/living-room",
+            chunk_id="https://homestyle.lge.co.kr/item?productId=G25070000210#section-2",
+            page_url="https://homestyle.lge.co.kr/item?productId=G25070000210",
             locale="ko",
             title="거실 컬렉션",
-            breadcrumb=("collection", "living-room"),
+            breadcrumb=(),
             section_heading="이미지 설명",
             content="## 이미지 설명\n\n패브릭 소파 조합입니다.",
         ),
@@ -505,14 +504,14 @@ async def test_ingestion_pipeline_routes_pending_vlm_segments_to_review_queue(
         "https://static-store.lge.co.kr/sitemap/sitemap.xml": """
             <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <sitemap>
-                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml</loc>
+                                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_product.xml</loc>
               </sitemap>
             </sitemapindex>
         """,
-        "https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml": """
+                "https://homestyle.lge.co.kr/sitemap/sitemap_product.xml": """
             <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <url>
-                <loc>https://homestyle.lge.co.kr/collection/living-room</loc>
+                                <loc>https://homestyle.lge.co.kr/item?productId=G25070000210</loc>
               </url>
             </urlset>
         """,
@@ -524,7 +523,7 @@ async def test_ingestion_pipeline_routes_pending_vlm_segments_to_review_queue(
         return text_responses[url]
 
     async def fetch_page(url: str, headers: dict[str, str]) -> FetchResponse:
-        assert url == "https://homestyle.lge.co.kr/collection/living-room"
+        assert url == "https://homestyle.lge.co.kr/item?productId=G25070000210"
         assert headers == {}
         return FetchResponse(
             status_code=200,
@@ -588,8 +587,8 @@ async def test_ingestion_pipeline_routes_pending_vlm_segments_to_review_queue(
         sitemap_index_url="https://static-store.lge.co.kr/sitemap/sitemap.xml",
         config_path=write_config(tmp_path),
         previous_metadata_by_url={
-            "https://homestyle.lge.co.kr/collection/living-room": FetchMetadata(
-                url="https://homestyle.lge.co.kr/collection/living-room",
+            "https://homestyle.lge.co.kr/item?productId=G25070000210": FetchMetadata(
+                url="https://homestyle.lge.co.kr/item?productId=G25070000210",
                 etag=None,
                 last_modified=None,
                 content_hash=None,
@@ -602,11 +601,11 @@ async def test_ingestion_pipeline_routes_pending_vlm_segments_to_review_queue(
     assert queued_pages[0][0].segments[1].review_state == "pending"
     assert sections == [
         SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/collection/living-room#section-1",
-            page_url="https://homestyle.lge.co.kr/collection/living-room",
+            chunk_id="https://homestyle.lge.co.kr/item?productId=G25070000210#section-1",
+            page_url="https://homestyle.lge.co.kr/item?productId=G25070000210",
             locale="ko",
             title="거실 컬렉션",
-            breadcrumb=("collection", "living-room"),
+            breadcrumb=(),
             section_heading="거실 제안",
             content="## 거실 제안\n\n짧은 본문",
             extraction_version="v2",

@@ -1,7 +1,7 @@
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 import tomllib
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 from xml.etree import ElementTree
 
 from homestyle_ingestion.domain.discovery import DiscoveredUrl, DiscoveryBootstrap, DiscoveryConfig
@@ -51,21 +51,15 @@ class DiscoveryService:
 
         locale = discovery_config.get("locale")
         allowed_hosts = discovery_config.get("allowed_hosts")
-        allowed_url_prefixes = discovery_config.get("allowed_url_prefixes")
 
         if not isinstance(locale, str) or not locale:
             raise DiscoveryConfigurationError("discovery.locale must be a non-empty string.")
         if not self._is_string_list(allowed_hosts):
             raise DiscoveryConfigurationError("discovery.allowed_hosts must be a list of strings.")
-        if not self._is_string_list(allowed_url_prefixes):
-            raise DiscoveryConfigurationError(
-                "discovery.allowed_url_prefixes must be a list of strings."
-            )
 
         return DiscoveryConfig(
             locale=locale,
             allowed_hosts=tuple(allowed_hosts),
-            allowed_url_prefixes=tuple(allowed_url_prefixes),
         )
 
     def _parse_sitemap_index(self, sitemap_index_xml: str) -> list[str]:
@@ -125,11 +119,11 @@ class DiscoveryService:
         if parsed_url.hostname not in config.allowed_hosts:
             return False
 
-        path_with_query = parsed_url.path
-        if parsed_url.query:
-            path_with_query = f"{path_with_query}?{parsed_url.query}"
+        if parsed_url.path != "/item":
+            return False
 
-        return any(path_with_query.startswith(prefix) for prefix in config.allowed_url_prefixes)
+        query_params = parse_qs(parsed_url.query)
+        return any(product_id.strip() for product_id in query_params.get("productId", []))
 
     def _is_string_list(self, value: object) -> bool:
         return isinstance(value, list) and all(isinstance(item, str) and item for item in value)

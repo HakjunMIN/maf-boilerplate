@@ -14,7 +14,6 @@ def write_config(tmp_path: Path) -> Path:
                 "[discovery]",
                 'locale = "ko"',
                 'allowed_hosts = ["homestyle.lge.co.kr"]',
-                'allowed_url_prefixes = ["/home", "/collection", "/shop?"]',
             ]
         ),
         encoding="utf-8",
@@ -34,14 +33,14 @@ async def test_discover_from_robots_reads_sitemap_index_then_discovers_urls(tmp_
         "https://static-store.lge.co.kr/sitemap/sitemap.xml": """
             <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <sitemap>
-                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml</loc>
+                                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_product.xml</loc>
               </sitemap>
             </sitemapindex>
         """,
-        "https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml": """
+                "https://homestyle.lge.co.kr/sitemap/sitemap_product.xml": """
             <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <url>
-                <loc>https://homestyle.lge.co.kr/home</loc>
+                                <loc>https://homestyle.lge.co.kr/item?productId=G25070000210</loc>
               </url>
             </urlset>
         """,
@@ -62,10 +61,10 @@ async def test_discover_from_robots_reads_sitemap_index_then_discovers_urls(tmp_
         crawl_delay_seconds=0.5,
         discovered_urls=[
             DiscoveredUrl(
-                url="https://homestyle.lge.co.kr/home",
+                url="https://homestyle.lge.co.kr/item?productId=G25070000210",
                 locale="ko",
                 lastmod=None,
-                source_sitemap_url="https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml",
+                source_sitemap_url="https://homestyle.lge.co.kr/sitemap/sitemap_product.xml",
             )
         ],
     )
@@ -92,38 +91,34 @@ async def test_discover_from_robots_fails_when_sitemap_entrypoint_is_missing(tmp
 
 
 @pytest.mark.asyncio
-async def test_discover_returns_only_allowlisted_homestyle_urls(tmp_path: Path) -> None:
+async def test_discover_returns_only_product_detail_urls(tmp_path: Path) -> None:
     responses = {
         "https://static-store.lge.co.kr/sitemap/sitemap.xml": """
             <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <sitemap>
-                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_product-list.xml</loc>
-              </sitemap>
-              <sitemap>
-                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml</loc>
+                                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_product.xml</loc>
               </sitemap>
             </sitemapindex>
         """,
-        "https://homestyle.lge.co.kr/sitemap/sitemap_product-list.xml": """
+                "https://homestyle.lge.co.kr/sitemap/sitemap_product.xml": """
             <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <url>
-                <loc>https://homestyle.lge.co.kr/shop?superCategoryId=2506000003</loc>
+                                <loc>https://homestyle.lge.co.kr/item?productId=G25070000210</loc>
               </url>
               <url>
-                <loc>https://homestyle.lge.co.kr/search?q=bed</loc>
+                                <loc>https://homestyle.lge.co.kr/item?productId=G25070000211&amp;foo=bar</loc>
               </url>
               <url>
-                <loc>https://www.lge.co.kr/not-in-scope</loc>
-              </url>
-            </urlset>
-        """,
-        "https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml": """
-            <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-              <url>
-                <loc>https://homestyle.lge.co.kr/home</loc>
+                                <loc>https://homestyle.lge.co.kr/item</loc>
               </url>
               <url>
-                <loc>https://homestyle.lge.co.kr/collection</loc>
+                                <loc>https://homestyle.lge.co.kr/item?productId=</loc>
+              </url>
+              <url>
+                                <loc>https://homestyle.lge.co.kr/collection</loc>
+                            </url>
+                            <url>
+                                <loc>https://www.lge.co.kr/item?productId=G25070000212</loc>
               </url>
             </urlset>
         """,
@@ -141,22 +136,16 @@ async def test_discover_returns_only_allowlisted_homestyle_urls(tmp_path: Path) 
 
     assert discovered_urls == [
         DiscoveredUrl(
-            url="https://homestyle.lge.co.kr/shop?superCategoryId=2506000003",
+            url="https://homestyle.lge.co.kr/item?productId=G25070000210",
             locale="ko",
             lastmod=None,
-            source_sitemap_url="https://homestyle.lge.co.kr/sitemap/sitemap_product-list.xml",
+            source_sitemap_url="https://homestyle.lge.co.kr/sitemap/sitemap_product.xml",
         ),
         DiscoveredUrl(
-            url="https://homestyle.lge.co.kr/home",
+            url="https://homestyle.lge.co.kr/item?productId=G25070000211&foo=bar",
             locale="ko",
             lastmod=None,
-            source_sitemap_url="https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml",
-        ),
-        DiscoveredUrl(
-            url="https://homestyle.lge.co.kr/collection",
-            locale="ko",
-            lastmod=None,
-            source_sitemap_url="https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml",
+            source_sitemap_url="https://homestyle.lge.co.kr/sitemap/sitemap_product.xml",
         ),
     ]
 
@@ -167,18 +156,18 @@ async def test_discover_keeps_lastmod_and_source_sitemap(tmp_path: Path) -> None
         "https://static-store.lge.co.kr/sitemap/sitemap.xml": """
             <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <sitemap>
-                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_event.xml</loc>
+                                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_product.xml</loc>
               </sitemap>
             </sitemapindex>
         """,
-        "https://homestyle.lge.co.kr/sitemap/sitemap_event.xml": """
+                "https://homestyle.lge.co.kr/sitemap/sitemap_product.xml": """
             <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <url>
-                <loc>https://homestyle.lge.co.kr/shop?superCategoryId=2506000004</loc>
+                                <loc>https://homestyle.lge.co.kr/item?productId=G25070000212</loc>
                 <lastmod>2026-04-20</lastmod>
               </url>
               <url>
-                <loc>https://homestyle.lge.co.kr/home</loc>
+                                <loc>https://homestyle.lge.co.kr/item</loc>
               </url>
             </urlset>
         """,
@@ -196,15 +185,9 @@ async def test_discover_keeps_lastmod_and_source_sitemap(tmp_path: Path) -> None
 
     assert discovered_urls == [
         DiscoveredUrl(
-            url="https://homestyle.lge.co.kr/shop?superCategoryId=2506000004",
+            url="https://homestyle.lge.co.kr/item?productId=G25070000212",
             locale="ko",
             lastmod="2026-04-20",
-            source_sitemap_url="https://homestyle.lge.co.kr/sitemap/sitemap_event.xml",
-        ),
-        DiscoveredUrl(
-            url="https://homestyle.lge.co.kr/home",
-            locale="ko",
-            lastmod=None,
-            source_sitemap_url="https://homestyle.lge.co.kr/sitemap/sitemap_event.xml",
+            source_sitemap_url="https://homestyle.lge.co.kr/sitemap/sitemap_product.xml",
         ),
     ]

@@ -6,7 +6,7 @@ from openai import AsyncAzureOpenAI
 
 EmbedText = Callable[[str], Awaitable[list[float]]]
 
-_AZURE_OPENAI_SCOPE = "https://ai.azure.com/.default"
+_AZURE_OPENAI_SCOPE = "https://cognitiveservices.azure.com/.default"
 
 
 class AzureOpenAIEmbedder:
@@ -15,12 +15,14 @@ class AzureOpenAIEmbedder:
         *,
         endpoint: str,
         deployment: str,
+        api_version: str,
         credential: TokenCredential,
     ) -> None:
         token_provider = get_bearer_token_provider(credential, _AZURE_OPENAI_SCOPE)
         self._client = AsyncAzureOpenAI(
-            base_url=f"{endpoint.rstrip('/')}/openai/v1/",
-            api_key=token_provider,
+            azure_endpoint=endpoint,
+            azure_ad_token_provider=token_provider,
+            api_version=api_version,
         )
         self._deployment = deployment
 
@@ -41,32 +43,35 @@ class AzureOpenAIVisionExtractor:
         *,
         endpoint: str,
         deployment: str,
+        api_version: str,
         credential: TokenCredential,
     ) -> None:
         token_provider = get_bearer_token_provider(credential, _AZURE_OPENAI_SCOPE)
         self._client = AsyncAzureOpenAI(
-            base_url=f"{endpoint.rstrip('/')}/openai/v1/",
-            api_key=token_provider,
+            azure_endpoint=endpoint,
+            azure_ad_token_provider=token_provider,
+            api_version=api_version,
         )
         self._deployment = deployment
 
     async def extract_markdown(self, prompt: str, image_urls: list[str]) -> str:
-        response = await self._client.responses.create(
+        response = await self._client.chat.completions.create(
             model=self._deployment,
-            input=[
+            messages=[
                 {
                     "role": "user",
                     "content": [
-                        {"type": "input_text", "text": prompt},
+                        {"type": "text", "text": prompt},
                         *(
-                            {"type": "input_image", "image_url": image_url}
+                            {"type": "image_url", "image_url": {"url": image_url}}
                             for image_url in image_urls
                         ),
                     ],
                 }
             ],
         )
-        return response.output_text.strip()
+        content = response.choices[0].message.content
+        return (content or "").strip()
 
     async def close(self) -> None:
         await self._client.close()

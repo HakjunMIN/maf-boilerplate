@@ -13,7 +13,6 @@ class DiscoveredUrl:
 class DiscoveryConfig:
     locale: str
     allowed_hosts: tuple[str, ...]
-    allowed_url_prefixes: tuple[str, ...]
 
 
 @dataclass(frozen=True)

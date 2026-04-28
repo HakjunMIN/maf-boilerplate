@@ -20,10 +20,18 @@ async def test_azure_rag_runtime_answers_and_closes_via_public_seam(
             close_events.append("credential")
 
     class FakeEmbedder:
-        def __init__(self, *, endpoint: str, deployment: str, credential: object) -> None:
+        def __init__(
+            self,
+            *,
+            endpoint: str,
+            deployment: str,
+            api_version: str,
+            credential: object,
+        ) -> None:
             captured_embedder.update(
                 endpoint=endpoint,
                 deployment=deployment,
+                api_version=api_version,
                 credential=credential,
             )
 
@@ -135,6 +143,7 @@ async def test_azure_rag_runtime_answers_and_closes_via_public_seam(
     )
     assert captured_embedder["endpoint"] == "https://openai.example"
     assert captured_embedder["deployment"] == "embedding-deployment"
+    assert captured_embedder["api_version"] == "2025-07-01-preview"
     assert captured_retriever["endpoint"] == "https://search.example"
     assert captured_retriever["index_name"] == "sections"
     assert captured_retriever["top"] == 4
@@ -168,7 +177,14 @@ async def test_azure_rag_runtime_logs_with_correlation_id(monkeypatch: pytest.Mo
         pass
 
     class FakeEmbedder:
-        def __init__(self, *, endpoint: str, deployment: str, credential: object) -> None:
+        def __init__(
+            self,
+            *,
+            endpoint: str,
+            deployment: str,
+            api_version: str,
+            credential: object,
+        ) -> None:
             return None
 
         async def embed_text(self, text: str) -> list[float]:

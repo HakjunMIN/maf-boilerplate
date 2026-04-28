@@ -41,9 +41,9 @@ LG 홈스타일 관련 웹 콘텐츠를 바탕으로 질문에 답하는 에이�
 
 - The first release targets a single locale: `ko`.
 - The first release targets only public HTML pages published under `https://homestyle.lge.co.kr`.
-- URL discovery begins from the sitemap entrypoint declared in `https://homestyle.lge.co.kr/robots.txt` (`https://static-store.lge.co.kr/sitemap/sitemap.xml`), follows the category/page-type sub-sitemaps under `https://homestyle.lge.co.kr/sitemap/`, then applies a **path/query allowlist** to filter relevant URLs.
-- The path/query allowlist (e.g., `/home`, `/collection`, `/brand`, `/event`, `/interior`, `/shop?`) is managed in a **configuration file** and can be updated operationally without code changes.
-- URLs outside the `homestyle.lge.co.kr` host or outside the allowlist are excluded from the first release.
+- URL discovery begins from the sitemap entrypoint declared in `https://homestyle.lge.co.kr/robots.txt` (`https://static-store.lge.co.kr/sitemap/sitemap.xml`), follows the category/page-type sub-sitemaps under `https://homestyle.lge.co.kr/sitemap/`, then keeps only product detail URLs.
+- A URL is in scope only when the host is `homestyle.lge.co.kr`, the path is exactly `/item`, and the query string contains a non-empty `productId` parameter. Additional query parameters are allowed.
+- URLs outside the `homestyle.lge.co.kr` host or outside the product detail rule are excluded from the first release.
 - Sitemap entries without `<lastmod>` are **always fetched** (change detection relies on conditional HTTP headers, not sitemap timestamps alone).
 
 ### Crawling & Incremental Refresh

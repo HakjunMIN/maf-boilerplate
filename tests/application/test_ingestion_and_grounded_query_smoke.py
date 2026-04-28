@@ -16,7 +16,6 @@ def write_config(tmp_path: Path) -> Path:
                 "[discovery]",
                 'locale = "ko"',
                 'allowed_hosts = ["homestyle.lge.co.kr"]',
-                'allowed_url_prefixes = ["/collection"]',
             ]
         ),
         encoding="utf-8",
@@ -30,14 +29,14 @@ async def test_smoke_path_ingests_sections_then_answers_from_retrieved_evidence(
         "https://static-store.lge.co.kr/sitemap/sitemap.xml": """
             <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <sitemap>
-                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml</loc>
+                                <loc>https://homestyle.lge.co.kr/sitemap/sitemap_product.xml</loc>
               </sitemap>
             </sitemapindex>
         """,
-        "https://homestyle.lge.co.kr/sitemap/sitemap_collection.xml": """
+                "https://homestyle.lge.co.kr/sitemap/sitemap_product.xml": """
             <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
               <url>
-                <loc>https://homestyle.lge.co.kr/collection/living-room</loc>
+                                <loc>https://homestyle.lge.co.kr/item?productId=G25070000210</loc>
               </url>
             </urlset>
         """,
@@ -48,7 +47,7 @@ async def test_smoke_path_ingests_sections_then_answers_from_retrieved_evidence(
         return text_responses[url]
 
     async def fetch_page(url: str, headers: dict[str, str]) -> FetchResponse:
-        assert url == "https://homestyle.lge.co.kr/collection/living-room"
+        assert url == "https://homestyle.lge.co.kr/item?productId=G25070000210"
         assert headers == {}
         return FetchResponse(
             status_code=200,
@@ -66,7 +65,7 @@ async def test_smoke_path_ingests_sections_then_answers_from_retrieved_evidence(
         )
 
     async def render_page(url: str) -> str:
-        assert url == "https://homestyle.lge.co.kr/collection/living-room"
+        assert url == "https://homestyle.lge.co.kr/item?productId=G25070000210"
         return """
             <html>
               <body>
@@ -99,8 +98,8 @@ async def test_smoke_path_ingests_sections_then_answers_from_retrieved_evidence(
         sitemap_index_url="https://static-store.lge.co.kr/sitemap/sitemap.xml",
         config_path=write_config(tmp_path),
         previous_metadata_by_url={
-            "https://homestyle.lge.co.kr/collection/living-room": FetchMetadata(
-                url="https://homestyle.lge.co.kr/collection/living-room",
+            "https://homestyle.lge.co.kr/item?productId=G25070000210": FetchMetadata(
+                url="https://homestyle.lge.co.kr/item?productId=G25070000210",
                 etag=None,
                 last_modified=None,
                 content_hash=None,
@@ -115,5 +114,5 @@ async def test_smoke_path_ingests_sections_then_answers_from_retrieved_evidence(
 
     assert answer == (
         "렌더된 본문 근거입니다.\n\n"
-        "[1] https://homestyle.lge.co.kr/collection/living-room"
+        "[1] https://homestyle.lge.co.kr/item?productId=G25070000210"
     )
