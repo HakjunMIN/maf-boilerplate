@@ -1,5 +1,6 @@
 # homestyle-rag
 
+[![CI](https://github.com/HakjunMIN/maf-boilerplate/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/HakjunMIN/maf-boilerplate/actions/workflows/ci.yml)
 ![Engineering Quality](https://img.shields.io/badge/engineering%20quality-B%20(7.3%2F10)-yellowgreen)
 ![Pytest](https://img.shields.io/badge/pytest-82%2F82%20passing-brightgreen)
 ![Coverage](https://img.shields.io/badge/coverage-86%25-brightgreen)
@@ -7,6 +8,7 @@
 ![Mypy](https://img.shields.io/badge/mypy-passing-brightgreen)
 
 LG 홈스타일 공개 콘텐츠를 수집하고, Azure AI Search와 Microsoft Agent Framework를 이용해 근거 기반 한국어 응답을 제공하는 실험용 RAG 하네스다. 이 저장소는 기능 데모보다 소프트웨어 엔지니어링 기본기에 충실한 개발 하네스를 만드는 데 더 큰 비중을 두었다.
+
 
 ## 이 저장소가 강조하는 것
 
@@ -21,7 +23,7 @@ LG 홈스타일 공개 콘텐츠를 수집하고, Azure AI Search와 Microsoft A
 
 ## 개발 방식
 
-이 프로젝트의 개발 과정은 인터뷰를 통해 요구사항을 정밀화하고, 그 결과를 PRD와 유비쿼터스 언어로 고정한 뒤, 테스트를 먼저 세우고 구현을 얇게 전개하는 방식으로 진행했다. 흐름 자체는 사용자가 언급한 영상의 방식과 맞닿아 있지만, 이 저장소는 스펙을 단일 진실 공급원으로 삼는 개방형 운영 모델은 아니다. 즉, 스펙 문서는 중요한 경계이지만 코드, 테스트, 운영 판단이 함께 현실의 진실을 구성한다.
+이 프로젝트의 개발 과정은 인터뷰를 통해 요구사항을 정밀화하고, 그 결과를 PRD와 유비쿼터스 언어로 고정한 뒤, 테스트를 먼저 세우고 구현을 얇게 전개하는 방식으로 진행했다. 저장소는 스펙을 단일 진실 공급원으로 삼는 개방형 운영 모델은 아니다. 즉, 스펙 문서는 중요한 경계이지만 코드, 테스트, 운영 판단이 함께 현실의 진실을 구성한다.
 
 ## 개발 라이프사이클
 
