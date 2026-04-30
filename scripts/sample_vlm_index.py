@@ -585,7 +585,7 @@ def _sniff_supported_content_type(image_bytes: bytes) -> str | None:
 async def _ensure_search_index(*, endpoint: str, index_name: str, credential: object) -> None:
     import urllib.request as _urllib_request
 
-    token = credential.get_token("https://search.azure.com/.default")  # type: ignore[union-attr]
+    token = await credential.get_token("https://search.azure.com/.default")  # type: ignore[union-attr]
     index_definition = {
         "name": index_name,
         "fields": [
