@@ -1,0 +1,4 @@
+[discovery]
+locale = "ko"
+allowed_hosts = ["homestyle.lge.co.kr"]
+

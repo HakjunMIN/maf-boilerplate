@@ -12,3 +12,4 @@ backend/.pytest_cache/
 backend/.coverage
 frontend/node_modules/
 frontend/dist/
+.*crawl*/
