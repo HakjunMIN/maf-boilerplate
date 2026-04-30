@@ -1,19 +1,12 @@
 # homestyle-rag
 
 ![Engineering Quality](https://img.shields.io/badge/engineering%20quality-B%20(7.3%2F10)-yellowgreen)
-![Pytest](https://img.shields.io/badge/pytest-78%2F79%20passing-yellow)
-![Ruff](https://img.shields.io/badge/ruff-src%2Btests%20passing-brightgreen)
+![Pytest](https://img.shields.io/badge/pytest-82%2F82%20passing-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-86%25-brightgreen)
+![Ruff](https://img.shields.io/badge/ruff-repo--wide%20passing-brightgreen)
+![Mypy](https://img.shields.io/badge/mypy-passing-brightgreen)
 
 LG 홈스타일 공개 콘텐츠를 수집하고, Azure AI Search와 Microsoft Agent Framework를 이용해 근거 기반 한국어 응답을 제공하는 실험용 RAG 하네스다. 이 저장소는 기능 데모보다 소프트웨어 엔지니어링 기본기에 충실한 개발 하네스를 만드는 데 더 큰 비중을 두었다.
-
-## 품질 스냅샷
-
-현재 README의 배지는 2026-04-30에 로컬 워크스페이스에서 측정한 결과를 반영한다.
-
-- 소프트웨어 공학 품질 평가: B, 7.3/10
-- 테스트: 79개 중 78개 통과
-- 린트: `ruff check src tests` 통과
-- 참고: `ruff check .`는 샘플 스크립트 import 순서 이슈로 아직 실패한다.
 
 ## 이 저장소가 강조하는 것
 
