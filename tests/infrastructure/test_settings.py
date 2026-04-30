@@ -42,6 +42,12 @@ def test_azure_rag_settings_from_env_loads_required_and_optional_values() -> Non
 def test_azure_rag_settings_from_env_reads_process_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.delenv("USE_DEVELOPER_CREDENTIALS", raising=False)
+    monkeypatch.delenv("MANAGED_IDENTITY_CLIENT_ID", raising=False)
+    monkeypatch.delenv("SEARCH_TOP", raising=False)
+    monkeypatch.delenv("EXTRACTION_VERSION", raising=False)
+    monkeypatch.delenv("LOG_LEVEL", raising=False)
+    monkeypatch.delenv("APPLICATION_INSIGHTS_CONNECTION_STRING", raising=False)
     monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", " https://openai.example ")
     monkeypatch.setenv("AZURE_OPENAI_API_VERSION", "2025-07-01-preview")
     monkeypatch.setenv("AZURE_OPENAI_CHAT_DEPLOYMENT", "chat-deployment")

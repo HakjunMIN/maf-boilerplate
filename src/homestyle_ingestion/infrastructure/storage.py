@@ -140,9 +140,17 @@ class LocalPageStore:
 
     async def mark_segment_reviewed(self, url: str, segment_id: str) -> None:
         payload = self._load_payload(url)
-        segments = payload["page"].get("segments", [])
+        page_payload = payload.get("page")
+        if not isinstance(page_payload, dict):
+            raise PageStoreNotFoundError(url)
+
+        segments = page_payload.get("segments", [])
+        if not isinstance(segments, list):
+            raise PageStoreNotFoundError(url)
         for segment in segments:
-            if segment["segment_id"] == segment_id:
+            if not isinstance(segment, dict):
+                continue
+            if segment.get("segment_id") == segment_id:
                 segment["review_state"] = "approved"
                 self._write_payload(url, payload)
                 return
@@ -168,8 +176,14 @@ class LocalPageStore:
     def _metadata_from_payload(self, metadata_payload: dict[str, object]) -> FetchMetadata:
         return FetchMetadata(
             url=str(metadata_payload["url"]),
-            etag=metadata_payload["etag"],
-            last_modified=metadata_payload["last_modified"],
-            content_hash=metadata_payload["content_hash"],
+            etag=_normalize_optional_string(metadata_payload.get("etag")),
+            last_modified=_normalize_optional_string(metadata_payload.get("last_modified")),
+            content_hash=_normalize_optional_string(metadata_payload.get("content_hash")),
             fetch_failed=bool(metadata_payload["fetch_failed"]),
         )
+
+
+def _normalize_optional_string(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)

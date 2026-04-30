@@ -114,6 +114,9 @@ async def test_render_page_surfaces_timeout_as_render_page_error(monkeypatch: py
             assert selector
             return []
 
+        async def wait_for_selector(self, selector: str, timeout: int = 0) -> None:
+            return None
+
         async def wait_for_timeout(self, _: int) -> None:
             return None
 
@@ -168,6 +171,9 @@ async def test_render_page_opens_page_with_default_viewport_and_user_agent(
         async def query_selector_all(self, selector: str) -> list[object]:
             assert selector
             return []
+
+        async def wait_for_selector(self, selector: str, timeout: int = 0) -> None:
+            return None
 
         async def wait_for_timeout(self, _: int) -> None:
             return None
@@ -241,6 +247,9 @@ async def test_render_page_ignores_expand_click_failures(monkeypatch: pytest.Mon
             if selector == "text=더보기":
                 return [FakeElement()]
             return []
+
+        async def wait_for_selector(self, selector: str, timeout: int = 0) -> None:
+            return None
 
         async def wait_for_timeout(self, _: int) -> None:
             return None

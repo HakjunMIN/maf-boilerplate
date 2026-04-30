@@ -1,6 +1,20 @@
+from typing import Any, cast
+
 from playwright.async_api import Browser, Error, Page, Playwright, TimeoutError, async_playwright
 
 from homestyle_ingestion.domain.rendering import RenderPageError
+
+_CONTENT_READY_SELECTORS = ("h1", "[data-area]", "[class*='ProductDetail']")
+_CONTENT_READY_TIMEOUT_MS = 10_000
+
+
+async def _wait_for_content_ready(page: Page) -> None:
+    """Best-effort wait for SPA product content to hydrate after networkidle."""
+    selector = ", ".join(_CONTENT_READY_SELECTORS)
+    try:
+        await page.wait_for_selector(selector, timeout=_CONTENT_READY_TIMEOUT_MS)
+    except TimeoutError:
+        pass  # proceed with whatever DOM is available
 
 
 async def _expand_collapsed_sections(page: Page, pause_ms: int = 800) -> int:
@@ -41,6 +55,7 @@ class PlaywrightPageRenderer:
         page = await self._new_page()
         try:
             await page.goto(url, wait_until="networkidle")
+            await _wait_for_content_ready(page)
             await _expand_collapsed_sections(page)
             return await page.content()
         except TimeoutError as error:
@@ -62,7 +77,7 @@ class PlaywrightPageRenderer:
         browser = await self._get_browser()
         return await browser.new_page(
             user_agent=self._user_agent,
-            viewport=self._viewport,
+            viewport=cast(Any, self._viewport),
         )
 
     async def _get_browser(self) -> Browser:

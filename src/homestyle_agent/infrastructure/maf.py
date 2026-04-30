@@ -2,6 +2,7 @@ import importlib.metadata
 from typing import Any
 
 from azure.core.credentials import TokenCredential
+from azure.core.credentials_async import AsyncTokenCredential
 
 from homestyle_shared.domain.indexing import SectionDocument
 
@@ -18,7 +19,7 @@ class MafGroundedBodyGenerator:
         *,
         endpoint: str,
         model: str,
-        credential: TokenCredential,
+        credential: TokenCredential | AsyncTokenCredential,
         api_version: str,
     ) -> None:
         _patch_agent_framework_version()
@@ -66,4 +67,4 @@ def _patch_agent_framework_version() -> None:
 
     if getattr(agent_framework, "__version__", None):
         return
-    agent_framework.__version__ = importlib.metadata.version("agent-framework")
+    setattr(agent_framework, "__version__", importlib.metadata.version("agent-framework"))

@@ -1,6 +1,6 @@
 from collections.abc import Awaitable, Callable, Sequence
 
-from azure.core.credentials import TokenCredential
+from azure.core.credentials_async import AsyncTokenCredential
 from azure.search.documents.aio import SearchClient
 from azure.search.documents.models import VectorizedQuery
 
@@ -15,7 +15,7 @@ class AzureSearchSectionRetriever:
         *,
         endpoint: str,
         index_name: str,
-        credential: TokenCredential,
+        credential: AsyncTokenCredential,
         embed_query: EmbedQuery,
         top: int = 5,
     ) -> None:
@@ -45,7 +45,6 @@ class AzureSearchSectionRetriever:
                 "locale",
                 "title",
                 "breadcrumb",
-                "section_heading",
                 "content",
                 "confidence_score",
                 "is_image_derived",
@@ -63,7 +62,6 @@ class AzureSearchSectionRetriever:
                     locale=str(result["locale"]),
                     title=str(result["title"]),
                     breadcrumb=_normalize_breadcrumb(result.get("breadcrumb")),
-                    section_heading=_normalize_text(result.get("section_heading")),
                     content=str(result["content"]),
                     confidence_score=_normalize_float(result.get("confidence_score"), default=1.0),
                     is_image_derived=_normalize_bool(

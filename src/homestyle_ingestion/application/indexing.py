@@ -1,3 +1,5 @@
+from urllib.parse import parse_qs, urlparse
+
 from homestyle_ingestion.domain.extraction import ExtractedPage, ExtractedSegment
 from homestyle_shared.domain.indexing import SectionDocument
 
@@ -9,45 +11,28 @@ class SectionSplitter:
         locale: str,
         extraction_version: str = "v1",
     ) -> list[SectionDocument]:
-        sections: list[SectionDocument] = []
-        for segment in self._iter_indexable_segments(page):
-            current_lines: list[str] = []
-            current_heading = ""
-            for line in segment.markdown.split("\n\n"):
-                if line.startswith("## ") or line.startswith("### "):
-                    if current_lines:
-                        sections.append(
-                            self._build_section(
-                                page=page,
-                                locale=locale,
-                                segment=segment,
-                                extraction_version=extraction_version,
-                                section_number=len(sections) + 1,
-                                section_heading=current_heading,
-                                lines=current_lines,
-                            )
-                        )
-                    current_lines = [line]
-                    current_heading = line.removeprefix("## ").removeprefix("### ")
-                    continue
+        segments = self._iter_indexable_segments(page)
+        if not segments:
+            return []
 
-                if current_lines:
-                    current_lines.append(line)
-
-            if current_lines:
-                sections.append(
-                    self._build_section(
-                        page=page,
-                        locale=locale,
-                        segment=segment,
-                        extraction_version=extraction_version,
-                        section_number=len(sections) + 1,
-                        section_heading=current_heading,
-                        lines=current_lines,
-                    )
-                )
-
-        return sections
+        product_id = self._extract_product_id(page.url)
+        return [
+            SectionDocument(
+                chunk_id=page.url,
+                page_url=page.url,
+                locale=locale,
+                title=page.title,
+                breadcrumb=page.breadcrumb,
+                content=page.markdown,
+                product_id=product_id,
+                product_name=page.title,
+                confidence_score=min(segment.confidence_score for segment in segments),
+                is_image_derived=any(segment.is_image_derived for segment in segments),
+                extraction_version=extraction_version,
+                reviewer_approved=any(segment.review_state == "approved" for segment in segments)
+                and all(segment.review_state in {"approved", "not_required"} for segment in segments),
+            )
+        ]
 
     def _iter_indexable_segments(self, page: ExtractedPage) -> tuple[ExtractedSegment, ...]:
         if page.segments:
@@ -59,26 +44,10 @@ class SectionSplitter:
             ),
         )
 
-    def _build_section(
-        self,
-        page: ExtractedPage,
-        locale: str,
-        segment: ExtractedSegment,
-        extraction_version: str,
-        section_number: int,
-        section_heading: str,
-        lines: list[str],
-    ) -> SectionDocument:
-        return SectionDocument(
-            chunk_id=f"{page.url}#section-{section_number}",
-            page_url=page.url,
-            locale=locale,
-            title=page.title,
-            breadcrumb=page.breadcrumb,
-            section_heading=section_heading,
-            content="\n\n".join(lines),
-            confidence_score=segment.confidence_score,
-            is_image_derived=segment.is_image_derived,
-            extraction_version=extraction_version,
-            reviewer_approved=segment.review_state == "approved",
-        )
+    def _extract_product_id(self, page_url: str) -> str | None:
+        query = parse_qs(urlparse(page_url).query)
+        product_ids = query.get("productId")
+        if not product_ids:
+            return None
+        product_id = product_ids[0].strip()
+        return product_id or None

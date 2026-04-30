@@ -52,7 +52,7 @@ class LocalReviewQueue:
             page_url=str(payload["page_url"]),
             segment_id=str(payload["segment_id"]),
             markdown=str(payload["markdown"]),
-            confidence_score=float(payload["confidence_score"]),
+            confidence_score=_normalize_float(payload["confidence_score"]),
             extraction_version=str(payload["extraction_version"]),
             status=str(payload["status"]),
         )
@@ -72,3 +72,9 @@ class LocalReviewQueue:
             json.dumps(payload, ensure_ascii=False),
             encoding="utf-8",
         )
+
+
+def _normalize_float(value: object) -> float:
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return float(value)
+    return float(str(value))

@@ -1,7 +1,8 @@
 from collections.abc import Awaitable, Callable
+from typing import Any, cast
 
-from azure.core.credentials import TokenCredential
-from azure.identity import get_bearer_token_provider
+from azure.core.credentials_async import AsyncTokenCredential
+from azure.identity.aio import get_bearer_token_provider
 from openai import AsyncAzureOpenAI
 
 EmbedText = Callable[[str], Awaitable[list[float]]]
@@ -16,7 +17,7 @@ class AzureOpenAIEmbedder:
         endpoint: str,
         deployment: str,
         api_version: str,
-        credential: TokenCredential,
+        credential: AsyncTokenCredential,
     ) -> None:
         token_provider = get_bearer_token_provider(credential, _AZURE_OPENAI_SCOPE)
         self._client = AsyncAzureOpenAI(
@@ -44,7 +45,7 @@ class AzureOpenAIVisionExtractor:
         endpoint: str,
         deployment: str,
         api_version: str,
-        credential: TokenCredential,
+        credential: AsyncTokenCredential,
     ) -> None:
         token_provider = get_bearer_token_provider(credential, _AZURE_OPENAI_SCOPE)
         self._client = AsyncAzureOpenAI(
@@ -55,9 +56,9 @@ class AzureOpenAIVisionExtractor:
         self._deployment = deployment
 
     async def extract_markdown(self, prompt: str, image_urls: list[str]) -> str:
-        response = await self._client.chat.completions.create(
-            model=self._deployment,
-            messages=[
+        messages = cast(
+            Any,
+            [
                 {
                     "role": "user",
                     "content": [
@@ -69,6 +70,10 @@ class AzureOpenAIVisionExtractor:
                     ],
                 }
             ],
+        )
+        response = await self._client.chat.completions.create(
+            model=self._deployment,
+            messages=messages,
         )
         content = response.choices[0].message.content
         return (content or "").strip()

@@ -78,3 +78,45 @@ def test_extract_falls_back_to_url_path_when_breadcrumb_is_missing() -> None:
     )
 
     assert extracted_page.breadcrumb == ("brand", "story")
+
+
+def test_extract_keeps_price_promotion_and_table_content_from_html() -> None:
+    html = """
+        <html>
+          <body>
+            <main>
+              <h1>오브제컬렉션 냉장고</h1>
+              <div class="hero-price">3,290,000원</div>
+              <div class="promo-banner">카드 결제 시 7% 할인</div>
+              <section>
+                <h2>구매 혜택</h2>
+                <ul>
+                  <li>무이자 12개월</li>
+                  <li>설치비 무료</li>
+                </ul>
+                <table>
+                  <tr><th>용량</th><td>610L</td></tr>
+                  <tr><th>색상</th><td>베이지 / 실버</td></tr>
+                </table>
+              </section>
+              <div aria-hidden="true">숨김 배너</div>
+            </main>
+          </body>
+        </html>
+    """
+
+    extracted_page = DomExtractionService().extract(
+        url="https://homestyle.lge.co.kr/item?productId=G123",
+        html=html,
+    )
+
+    assert extracted_page.markdown == (
+        "# 오브제컬렉션 냉장고\n\n"
+        "3,290,000원\n\n"
+        "카드 결제 시 7% 할인\n\n"
+        "## 구매 혜택\n\n"
+      "- 무이자 12개월\n\n"
+      "- 설치비 무료\n\n"
+        "용량 | 610L\n\n"
+        "색상 | 베이지 / 실버"
+    )

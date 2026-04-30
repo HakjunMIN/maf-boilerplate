@@ -1,6 +1,7 @@
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 import tomllib
+from typing import TypeGuard
 from urllib.parse import parse_qs, urlparse
 from xml.etree import ElementTree
 
@@ -125,5 +126,5 @@ class DiscoveryService:
         query_params = parse_qs(parsed_url.query)
         return any(product_id.strip() for product_id in query_params.get("productId", []))
 
-    def _is_string_list(self, value: object) -> bool:
+    def _is_string_list(self, value: object) -> TypeGuard[list[str]]:
         return isinstance(value, list) and all(isinstance(item, str) and item for item in value)

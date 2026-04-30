@@ -1,7 +1,7 @@
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 
-from azure.core.credentials import TokenCredential
+from azure.core.credentials_async import AsyncTokenCredential
 from azure.search.documents.aio import SearchClient
 
 from homestyle_shared.domain.indexing import SectionDocument
@@ -15,7 +15,7 @@ class AzureSearchSectionIndexer:
         *,
         endpoint: str,
         index_name: str,
-        credential: TokenCredential,
+        credential: AsyncTokenCredential,
         embed_content: EmbedContent,
         extraction_version: str,
     ) -> None:
@@ -38,9 +38,10 @@ class AzureSearchSectionIndexer:
                     "locale": section.locale,
                     "title": section.title,
                     "breadcrumb": list(section.breadcrumb),
-                    "section_heading": section.section_heading,
                     "content": section.content,
                     "content_vector": await self._embed_content(section.content),
+                    "product_id": section.product_id,
+                    "product_name": section.product_name,
                     "confidence_score": section.confidence_score,
                     "is_image_derived": section.is_image_derived,
                     "extraction_version": section.extraction_version or self._extraction_version,

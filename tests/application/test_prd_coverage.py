@@ -50,14 +50,14 @@ async def test_low_confidence_vlm_segment_stays_unindexed_until_review_approval(
 
     assert pending_sections == [
         SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/collection/living-room#section-1",
+            chunk_id="https://homestyle.lge.co.kr/collection/living-room",
             page_url=page.url,
             locale="ko",
             title="거실 컬렉션",
             breadcrumb=("collection", "living-room"),
-            section_heading="거실 제안",
-            content="## 거실 제안\n\n짧은 본문",
+            content="# 거실 컬렉션\n\n## 거실 제안\n\n짧은 본문",
             extraction_version="v2",
+            product_name="거실 컬렉션",
         )
     ]
     assert len(pending_items) == 1
@@ -76,26 +76,16 @@ async def test_low_confidence_vlm_segment_stays_unindexed_until_review_approval(
 
     assert approved_sections == [
         SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/collection/living-room#section-1",
+            chunk_id="https://homestyle.lge.co.kr/collection/living-room",
             page_url=page.url,
             locale="ko",
             title="거실 컬렉션",
             breadcrumb=("collection", "living-room"),
-            section_heading="거실 제안",
-            content="## 거실 제안\n\n짧은 본문",
-            extraction_version="v2",
-        ),
-        SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/collection/living-room#section-2",
-            page_url=page.url,
-            locale="ko",
-            title="거실 컬렉션",
-            breadcrumb=("collection", "living-room"),
-            section_heading="이미지 설명",
-            content="## 이미지 설명\n\n검토가 필요한 이미지 설명입니다.",
+            content="# 거실 컬렉션\n\n## 거실 제안\n\n짧은 본문",
             confidence_score=0.42,
             is_image_derived=True,
             extraction_version="v2",
             reviewer_approved=True,
+            product_name="거실 컬렉션",
         ),
     ]

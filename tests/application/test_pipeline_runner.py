@@ -79,13 +79,13 @@ async def test_pipeline_runner_full_mode_reingests_without_previous_metadata(tmp
         captured_previous_metadata.update(previous_metadata_by_url)
         return [
             SectionDocument(
-                chunk_id=f"{discovered_url.url}#section-1",
+                chunk_id=discovered_url.url,
                 page_url=discovered_url.url,
                 locale="ko",
                 title="거실 컬렉션",
                 breadcrumb=("collection", "living-room"),
-                section_heading="거실 제안",
-                content="## 거실 제안\n\n밝은 톤의 거실 스타일링입니다.",
+                content="# 거실 컬렉션\n\n## 거실 제안\n\n밝은 톤의 거실 스타일링입니다.",
+                product_name="거실 컬렉션",
             )
         ]
 
@@ -488,13 +488,13 @@ async def test_pipeline_runner_incremental_mode_uses_real_ingestion_services_wit
     ]
     assert indexed_sections == [
         SectionDocument(
-            chunk_id=f"{live_url}#section-1",
+            chunk_id=live_url,
             page_url=live_url,
             locale="ko",
             title="거실 컬렉션",
             breadcrumb=("collection", "living-room"),
-            section_heading="거실 제안",
-            content="## 거실 제안\n\n밝은 톤의 거실 스타일링입니다.",
+            content="# 거실 컬렉션\n\n## 거실 제안\n\n밝은 톤의 거실 스타일링입니다.",
+            product_name="거실 컬렉션",
         )
     ]
     assert soft_deleted_pages == [(missing_url, deleted_at.isoformat())]

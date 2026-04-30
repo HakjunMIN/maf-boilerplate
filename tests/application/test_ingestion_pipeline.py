@@ -25,7 +25,9 @@ def write_config(tmp_path: Path) -> Path:
 
 
 @pytest.mark.asyncio
-async def test_ingestion_pipeline_discovers_fetches_extracts_splits_and_indexes(tmp_path: Path) -> None:
+async def test_ingestion_pipeline_discovers_fetches_extracts_indexes_one_document_per_product_url(
+    tmp_path: Path,
+) -> None:
     text_responses = {
         "https://static-store.lge.co.kr/sitemap/sitemap.xml": """
             <sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -93,13 +95,14 @@ async def test_ingestion_pipeline_discovers_fetches_extracts_splits_and_indexes(
 
     assert sections == [
         SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/item?productId=G25070000210#section-1",
+            chunk_id="https://homestyle.lge.co.kr/item?productId=G25070000210",
             page_url="https://homestyle.lge.co.kr/item?productId=G25070000210",
             locale="ko",
             title="거실 컬렉션",
             breadcrumb=(),
-            section_heading="거실 제안",
-            content="## 거실 제안\n\n밝은 톤의 거실 스타일링입니다.",
+            content="# 거실 컬렉션\n\n## 거실 제안\n\n밝은 톤의 거실 스타일링입니다.",
+            product_id="G25070000210",
+            product_name="거실 컬렉션",
         )
     ]
     assert indexed_sections == sections
@@ -279,13 +282,14 @@ async def test_ingestion_pipeline_uses_rendered_html_for_dom_extraction(tmp_path
     assert rendered_urls == ["https://homestyle.lge.co.kr/item?productId=G25070000210"]
     assert sections == [
         SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/item?productId=G25070000210#section-1",
+            chunk_id="https://homestyle.lge.co.kr/item?productId=G25070000210",
             page_url="https://homestyle.lge.co.kr/item?productId=G25070000210",
             locale="ko",
             title="렌더된 거실 컬렉션",
             breadcrumb=(),
-            section_heading="거실 제안",
-            content="## 거실 제안\n\n렌더된 본문입니다.",
+            content="# 렌더된 거실 컬렉션\n\n## 거실 제안\n\n렌더된 본문입니다.",
+            product_id="G25070000210",
+            product_name="렌더된 거실 컬렉션",
         )
     ]
     assert indexed_sections == sections
@@ -376,13 +380,14 @@ async def test_ingestion_pipeline_skips_page_when_renderer_fails_and_continues(
 
     assert sections == [
         SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/item?productId=G25070000999#section-1",
+            chunk_id="https://homestyle.lge.co.kr/item?productId=G25070000999",
             page_url="https://homestyle.lge.co.kr/item?productId=G25070000999",
             locale="ko",
             title="성공한 페이지",
             breadcrumb=(),
-            section_heading="거실 제안",
-            content="## 거실 제안\n\n성공한 렌더 본문입니다.",
+            content="# 성공한 페이지\n\n## 거실 제안\n\n성공한 렌더 본문입니다.",
+            product_id="G25070000999",
+            product_name="성공한 페이지",
         )
     ]
     assert indexed_sections == sections
@@ -475,22 +480,16 @@ async def test_ingestion_pipeline_enriches_page_with_vlm_before_section_splittin
     ]
     assert sections == [
         SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/item?productId=G25070000210#section-1",
+            chunk_id="https://homestyle.lge.co.kr/item?productId=G25070000210",
             page_url="https://homestyle.lge.co.kr/item?productId=G25070000210",
             locale="ko",
             title="거실 컬렉션",
             breadcrumb=(),
-            section_heading="거실 제안",
-            content="## 거실 제안\n\n짧은 본문",
-        ),
-        SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/item?productId=G25070000210#section-2",
-            page_url="https://homestyle.lge.co.kr/item?productId=G25070000210",
-            locale="ko",
-            title="거실 컬렉션",
-            breadcrumb=(),
-            section_heading="이미지 설명",
-            content="## 이미지 설명\n\n패브릭 소파 조합입니다.",
+            content="# 거실 컬렉션\n\n## 거실 제안\n\n짧은 본문\n\n## 이미지 설명\n\n패브릭 소파 조합입니다.",
+            confidence_score=1.0,
+            is_image_derived=False,
+            product_id="G25070000210",
+            product_name="거실 컬렉션",
         ),
     ]
     assert indexed_sections == sections
@@ -601,14 +600,15 @@ async def test_ingestion_pipeline_routes_pending_vlm_segments_to_review_queue(
     assert queued_pages[0][0].segments[1].review_state == "pending"
     assert sections == [
         SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/item?productId=G25070000210#section-1",
+            chunk_id="https://homestyle.lge.co.kr/item?productId=G25070000210",
             page_url="https://homestyle.lge.co.kr/item?productId=G25070000210",
             locale="ko",
             title="거실 컬렉션",
             breadcrumb=(),
-            section_heading="거실 제안",
-            content="## 거실 제안\n\n짧은 본문",
+            content="# 거실 컬렉션\n\n## 거실 제안\n\n짧은 본문",
             extraction_version="v2",
+            product_id="G25070000210",
+            product_name="거실 컬렉션",
         )
     ]
     assert indexed_sections == sections

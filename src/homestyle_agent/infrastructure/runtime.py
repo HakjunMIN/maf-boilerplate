@@ -8,6 +8,7 @@ from homestyle_shared.infrastructure.observability import (
     StructuredLogger,
     bind_correlation_id,
     build_logger,
+    configure_observability,
 )
 from homestyle_shared.infrastructure.openai import AzureOpenAIEmbedder
 from homestyle_shared.infrastructure.settings import AzureRagSettings
@@ -20,6 +21,10 @@ class AzureRagRuntime:
         *,
         logger: StructuredLogger | None = None,
     ) -> None:
+        configure_observability(
+            log_level=settings.log_level,
+            application_insights_connection_string=settings.application_insights_connection_string,
+        )
         self._credential = build_azure_credential(
             use_developer_credentials=settings.use_developer_credentials,
             managed_identity_client_id=settings.managed_identity_client_id,

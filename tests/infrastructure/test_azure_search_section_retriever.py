@@ -19,11 +19,10 @@ async def test_azure_search_section_retriever_normalizes_section_provenance(
             self._done = True
             return {
                 "chunk_id": "chunk-1",
-                "page_url": "https://homestyle.lge.co.kr/collection/living-room#section-1",
+                "page_url": "https://homestyle.lge.co.kr/collection/living-room",
                 "locale": "ko",
                 "title": "거실 컬렉션",
                 "breadcrumb": ["홈", "컬렉션", "거실"],
-                "section_heading": "이미지 설명",
                 "content": "패브릭 소파 조합입니다.",
                 "confidence_score": "0.88",
                 "is_image_derived": "true",
@@ -71,7 +70,6 @@ async def test_azure_search_section_retriever_normalizes_section_provenance(
         "locale",
         "title",
         "breadcrumb",
-        "section_heading",
         "content",
         "confidence_score",
         "is_image_derived",
@@ -79,7 +77,7 @@ async def test_azure_search_section_retriever_normalizes_section_provenance(
         "reviewer_approved",
     ]
     assert sections[0].breadcrumb == ("홈", "컬렉션", "거실")
-    assert sections[0].section_heading == "이미지 설명"
+    assert sections[0].section_heading == ""
     assert sections[0].confidence_score == 0.88
     assert sections[0].is_image_derived is True
     assert sections[0].extraction_version == "v2"

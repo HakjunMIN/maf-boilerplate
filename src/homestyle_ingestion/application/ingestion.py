@@ -18,6 +18,7 @@ SavePage = Callable[[ExtractedPage, FetchMetadata, str], Awaitable[None]]
 ExtractImageCandidates = Callable[[str, str], Awaitable[tuple[ImageCandidate, ...]]]
 EnrichPage = Callable[[ExtractedPage, tuple[ImageCandidate, ...]], Awaitable[ExtractedPage]]
 EnqueueReviewItems = Callable[[ExtractedPage, str], Awaitable[None]]
+ReportProgress = Callable[[int, int, str], None]
 
 
 class IngestionPipeline:
@@ -31,6 +32,7 @@ class IngestionPipeline:
         extract_image_candidates: ExtractImageCandidates | None = None,
         enrich_page: EnrichPage | None = None,
         enqueue_review_items: EnqueueReviewItems | None = None,
+        report_progress: ReportProgress | None = None,
         extraction_version: str = "v1",
         index_sections: IndexSections,
     ) -> None:
@@ -43,6 +45,7 @@ class IngestionPipeline:
         self._extract_image_candidates = extract_image_candidates
         self._enrich_page = enrich_page
         self._enqueue_review_items = enqueue_review_items
+        self._report_progress = report_progress
         self._extraction_version = extraction_version
         self._index_sections = index_sections
 
@@ -69,7 +72,10 @@ class IngestionPipeline:
         previous_metadata_by_url: Mapping[str, FetchMetadata],
     ) -> list[SectionDocument]:
         sections: list[SectionDocument] = []
-        for discovered_url in discovered_urls:
+        total_urls = len(discovered_urls)
+        for index, discovered_url in enumerate(discovered_urls, start=1):
+            if self._report_progress is not None:
+                self._report_progress(index, total_urls, discovered_url.url)
             previous_metadata = previous_metadata_by_url.get(
                 discovered_url.url,
                 FetchMetadata(

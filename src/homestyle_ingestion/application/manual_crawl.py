@@ -6,10 +6,11 @@ from typing import Literal, Protocol
 
 from homestyle_ingestion.domain.discovery import DiscoveredUrl, DiscoveryBootstrap
 from homestyle_ingestion.domain.fetch import FetchMetadata
+from homestyle_shared.domain.indexing import SectionDocument
 
 SelectionMode = Literal["sequential", "random"]
 BootstrapDiscovery = Callable[[str, Path], Awaitable[DiscoveryBootstrap]]
-RunDiscoveredIngestion = Callable[..., Awaitable[list[object]]]
+RunDiscoveredIngestion = Callable[..., Awaitable[list[SectionDocument]]]
 ShuffleUrls = Callable[[list[DiscoveredUrl]], None]
 
 

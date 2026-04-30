@@ -3,7 +3,7 @@ from homestyle_ingestion.domain.extraction import ExtractedPage, ExtractedSegmen
 from homestyle_shared.domain.indexing import SectionDocument
 
 
-def test_split_creates_sections_from_h2_and_h3_boundaries() -> None:
+def test_split_creates_one_page_document_per_url() -> None:
     page = ExtractedPage(
         url="https://homestyle.lge.co.kr/collection/living-room",
         title="거실 컬렉션",
@@ -25,31 +25,13 @@ def test_split_creates_sections_from_h2_and_h3_boundaries() -> None:
 
     assert sections == [
         SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/collection/living-room#section-1",
+            chunk_id="https://homestyle.lge.co.kr/collection/living-room",
             page_url=page.url,
             locale="ko",
             title="거실 컬렉션",
             breadcrumb=("홈", "컬렉션", "거실"),
-            section_heading="거실 제안",
-            content="## 거실 제안\n\n밝은 톤의 거실 스타일링입니다.",
-        ),
-        SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/collection/living-room#section-2",
-            page_url=page.url,
-            locale="ko",
-            title="거실 컬렉션",
-            breadcrumb=("홈", "컬렉션", "거실"),
-            section_heading="소파",
-            content="### 소파\n\n패브릭 소파를 중심으로 배치합니다.",
-        ),
-        SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/collection/living-room#section-3",
-            page_url=page.url,
-            locale="ko",
-            title="거실 컬렉션",
-            breadcrumb=("홈", "컬렉션", "거실"),
-            section_heading="수납",
-            content="## 수납\n\n낮은 수납장을 활용합니다.",
+            content=page.markdown,
+            product_name="거실 컬렉션",
         ),
     ]
 
@@ -88,29 +70,16 @@ def test_split_preserves_segment_provenance_and_skips_pending_review_segments() 
 
     assert sections == [
         SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/collection/living-room#section-1",
+            chunk_id="https://homestyle.lge.co.kr/collection/living-room",
             page_url=page.url,
             locale="ko",
             title="거실 컬렉션",
             breadcrumb=("홈", "컬렉션", "거실"),
-            section_heading="거실 제안",
-            content="## 거실 제안\n\n밝은 톤의 거실 스타일링입니다.",
-            confidence_score=1.0,
-            is_image_derived=False,
-            extraction_version="v2",
-            reviewer_approved=False,
-        ),
-        SectionDocument(
-            chunk_id="https://homestyle.lge.co.kr/collection/living-room#section-2",
-            page_url=page.url,
-            locale="ko",
-            title="거실 컬렉션",
-            breadcrumb=("홈", "컬렉션", "거실"),
-            section_heading="이미지 설명",
-            content="## 이미지 설명\n\n패브릭 소파 조합입니다.",
+            content=page.markdown,
             confidence_score=0.88,
             is_image_derived=True,
             extraction_version="v2",
             reviewer_approved=True,
+            product_name="거실 컬렉션",
         ),
     ]

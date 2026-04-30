@@ -65,13 +65,14 @@ async def test_azure_search_section_indexer_uses_section_provenance_fields(monke
     await indexer.upsert_sections(
         [
             SectionDocument(
-                chunk_id="chunk-1",
-                page_url="https://homestyle.lge.co.kr/collection/living-room",
+                chunk_id="https://homestyle.lge.co.kr/item?productId=G25070000210",
+                page_url="https://homestyle.lge.co.kr/item?productId=G25070000210",
                 locale="ko",
                 title="거실 컬렉션",
                 breadcrumb=("홈", "컬렉션", "거실"),
-                section_heading="이미지 설명",
-                content="## 이미지 설명\n\n패브릭 소파 조합입니다.",
+                content="# 거실 컬렉션\n\n## 이미지 설명\n\n패브릭 소파 조합입니다.",
+                product_id="G25070000210",
+                product_name="거실 컬렉션",
                 confidence_score=0.88,
                 is_image_derived=True,
                 extraction_version="v2",
@@ -81,6 +82,12 @@ async def test_azure_search_section_indexer_uses_section_provenance_fields(monke
     )
 
     assert captured_documents
+    assert captured_documents[0]["chunk_id"] == "https://homestyle.lge.co.kr/item?productId=G25070000210"
+    assert captured_documents[0]["page_url"] == "https://homestyle.lge.co.kr/item?productId=G25070000210"
+    assert captured_documents[0]["product_id"] == "G25070000210"
+    assert captured_documents[0]["product_name"] == "거실 컬렉션"
+    assert captured_documents[0]["content"] == "# 거실 컬렉션\n\n## 이미지 설명\n\n패브릭 소파 조합입니다."
+    assert captured_documents[0]["content_vector"] == [0.1, 0.2, 0.3]
     assert captured_documents[0]["confidence_score"] == 0.88
     assert captured_documents[0]["is_image_derived"] is True
     assert captured_documents[0]["extraction_version"] == "v2"
