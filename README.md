@@ -2,10 +2,10 @@
 
 [![CI](https://github.com/HakjunMIN/maf-boilerplate/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/HakjunMIN/maf-boilerplate/actions/workflows/ci.yml)
 ![Engineering Quality](https://img.shields.io/badge/engineering%20quality-B%20(7.3%2F10)-yellowgreen)
-![Pytest](https://img.shields.io/badge/pytest-82%2F82%20passing-brightgreen)
+[![Pytest](https://github.com/HakjunMIN/maf-boilerplate/actions/workflows/pytest.yml/badge.svg?branch=main)](https://github.com/HakjunMIN/maf-boilerplate/actions/workflows/pytest.yml)
 ![Coverage](https://img.shields.io/badge/coverage-86%25-brightgreen)
-![Ruff](https://img.shields.io/badge/ruff-repo--wide%20passing-brightgreen)
-![Mypy](https://img.shields.io/badge/mypy-passing-brightgreen)
+[![Ruff](https://github.com/HakjunMIN/maf-boilerplate/actions/workflows/ruff.yml/badge.svg?branch=main)](https://github.com/HakjunMIN/maf-boilerplate/actions/workflows/ruff.yml)
+[![Mypy](https://github.com/HakjunMIN/maf-boilerplate/actions/workflows/mypy.yml/badge.svg?branch=main)](https://github.com/HakjunMIN/maf-boilerplate/actions/workflows/mypy.yml)
 
 LG 홈스타일 공개 콘텐츠를 수집하고, Azure AI Search와 Microsoft Agent Framework를 이용해 근거 기반 한국어 응답을 제공하는 실험용 RAG 하네스다. 이 저장소는 기능 데모보다 소프트웨어 엔지니어링 기본기에 충실한 개발 하네스를 만드는 데 더 큰 비중을 두었다.
 
