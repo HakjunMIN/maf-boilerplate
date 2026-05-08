@@ -131,6 +131,42 @@ uv run playwright install chromium
 uv run pytest
 ```
 
+## 홈스타일 에이전트 HTTP API
+
+필수 환경 변수 이름은 아래와 같다. 실제 토큰, 키, 커넥션 스트링 값은 저장소에 기록하지 않는다.
+서버는 저장소 루트의 `.env`를 자동으로 읽고, 같은 이름의 프로세스 환경 변수가 있으면 그 값을 우선한다.
+
+```bash
+AZURE_OPENAI_ENDPOINT
+AZURE_OPENAI_API_VERSION
+AZURE_OPENAI_CHAT_DEPLOYMENT
+AZURE_OPENAI_EMBEDDING_DEPLOYMENT
+AZURE_OPENAI_VISION_DEPLOYMENT
+AZURE_SEARCH_ENDPOINT
+AZURE_SEARCH_INDEX_NAME
+HOMESTYLE_AGENT_BEARER_TOKEN
+```
+
+로컬 개발에서 `Token tenant ... does not match resource tenant` 오류가 나면 Azure CLI가 다른 tenant로 로그인된 상태다. Azure OpenAI 리소스가 속한 tenant로 `az login --tenant <tenant-id>`를 다시 수행하거나, 루트 `.env`에 `AZURE_TENANT_ID=<tenant-id>`를 지정한다.
+Azure AI Search RBAC 권한이 없고 로컬 `.env`에 `AZURE_SEARCH_ADMIN_KEY`가 있으면 서버는 Search 요청에만 해당 키를 사용한다.
+
+로컬 실행:
+
+```bash
+PYTHONPATH=src uv run python -m homestyle_agent.api.server
+```
+
+질문 요청:
+
+```bash
+curl -X POST http://127.0.0.1:8080/ask \
+  -H "Authorization: Bearer $HOMESTYLE_AGENT_BEARER_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"question":"거실 스타일링을 알려줘"}'
+```
+
+응답은 Azure AI Search에서 검색된 근거만 사용하며, 끝에 번호가 붙은 출처 URL과 섹션명을 포함한다. 후속 질문은 응답의 `session_id`를 다음 요청에 함께 보내 multi-turn 세션으로 이어갈 수 있다.
+
 수동 크롤/인덱싱 검증은 아래 문서를 참고하면 된다.
 
 - [scripts/README.md](./scripts/README.md)

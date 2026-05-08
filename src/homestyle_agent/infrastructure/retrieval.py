@@ -1,5 +1,6 @@
 from collections.abc import Awaitable, Callable, Sequence
 
+from azure.core.credentials import AzureKeyCredential
 from azure.core.credentials_async import AsyncTokenCredential
 from azure.search.documents.aio import SearchClient
 from azure.search.documents.models import VectorizedQuery
@@ -7,6 +8,7 @@ from azure.search.documents.models import VectorizedQuery
 from homestyle_shared.domain.indexing import SectionDocument
 
 EmbedQuery = Callable[[str], Awaitable[list[float]]]
+_MAX_SEARCH_TOP = 5
 
 
 class AzureSearchSectionRetriever:
@@ -15,7 +17,7 @@ class AzureSearchSectionRetriever:
         *,
         endpoint: str,
         index_name: str,
-        credential: AsyncTokenCredential,
+        credential: AzureKeyCredential | AsyncTokenCredential,
         embed_query: EmbedQuery,
         top: int = 5,
     ) -> None:
@@ -25,7 +27,7 @@ class AzureSearchSectionRetriever:
             credential=credential,
         )
         self._embed_query = embed_query
-        self._top = top
+        self._top = min(top, _MAX_SEARCH_TOP)
 
     async def retrieve_sections(self, question: str) -> list[SectionDocument]:
         question_vector = await self._embed_query(question)
@@ -38,6 +40,7 @@ class AzureSearchSectionRetriever:
                     k_nearest_neighbors=self._top,
                 )
             ],
+            filter="locale eq 'ko'",
             top=self._top,
             select=[
                 "chunk_id",
@@ -63,6 +66,7 @@ class AzureSearchSectionRetriever:
                     title=str(result["title"]),
                     breadcrumb=_normalize_breadcrumb(result.get("breadcrumb")),
                     content=str(result["content"]),
+                    section_heading=_normalize_text(result.get("section_heading")),
                     confidence_score=_normalize_float(result.get("confidence_score"), default=1.0),
                     is_image_derived=_normalize_bool(
                         result.get("is_image_derived"),

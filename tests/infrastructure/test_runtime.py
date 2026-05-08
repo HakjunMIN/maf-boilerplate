@@ -1,6 +1,7 @@
 import pytest
 
 from homestyle_agent.application.grounded_query import GroundedQueryService
+from homestyle_agent.application.grounded_query import DECLINE_MESSAGE
 from homestyle_agent import AzureRagRuntime
 from homestyle_shared.domain import SectionDocument
 from homestyle_shared.infrastructure import AzureRagSettings
@@ -12,6 +13,7 @@ async def test_azure_rag_runtime_answers_and_closes_via_public_seam(
 ) -> None:
     close_events: list[str] = []
     captured_embedder: dict[str, object] = {}
+    captured_credential: dict[str, object] = {}
     captured_retriever: dict[str, object] = {}
     captured_generator: dict[str, object] = {}
 
@@ -104,7 +106,7 @@ async def test_azure_rag_runtime_answers_and_closes_via_public_seam(
 
     monkeypatch.setattr(
         "homestyle_agent.infrastructure.runtime.build_azure_credential",
-        lambda **_: FakeCredential(),
+        lambda **kwargs: captured_credential.update(kwargs) or FakeCredential(),
     )
     monkeypatch.setattr(
         "homestyle_agent.infrastructure.runtime.AzureOpenAIEmbedder",
@@ -127,9 +129,11 @@ async def test_azure_rag_runtime_answers_and_closes_via_public_seam(
         azure_openai_vision_deployment="vision-deployment",
         azure_search_endpoint="https://search.example",
         azure_search_index_name="sections",
+        azure_search_admin_key="search-admin-key",
         use_developer_credentials=False,
+        azure_tenant_id="tenant-id",
         managed_identity_client_id=None,
-        search_top=4,
+        search_top=20,
         extraction_version="v2",
     )
 
@@ -139,19 +143,25 @@ async def test_azure_rag_runtime_answers_and_closes_via_public_seam(
 
     assert answer == (
         "패브릭 소파 중심의 거실 구성을 추천합니다.\n\n"
-        "[1] https://homestyle.lge.co.kr/collection/living-room#section-1"
+        "[1] 거실 제안 - https://homestyle.lge.co.kr/collection/living-room#section-1"
     )
     assert captured_embedder["endpoint"] == "https://openai.example"
+    assert captured_credential == {
+        "use_developer_credentials": False,
+        "azure_tenant_id": "tenant-id",
+        "managed_identity_client_id": None,
+    }
     assert captured_embedder["deployment"] == "embedding-deployment"
     assert captured_embedder["api_version"] == "2025-07-01-preview"
     assert captured_retriever["endpoint"] == "https://search.example"
     assert captured_retriever["index_name"] == "sections"
-    assert captured_retriever["top"] == 4
+    assert captured_retriever["credential"] is not captured_embedder["credential"]
+    assert captured_retriever["credential"].key == "search-admin-key"
+    assert captured_retriever["top"] == 5
     assert captured_retriever["embed_query"] == runtime._embedder.embed_text
     assert captured_generator["model"] == "chat-deployment"
     assert captured_generator["api_version"] == "2025-07-01-preview"
-    assert captured_embedder["credential"] is captured_retriever["credential"]
-    assert captured_retriever["credential"] is captured_generator["credential"]
+    assert captured_embedder["credential"] is captured_generator["credential"]
 
     await runtime.close()
 
@@ -270,13 +280,16 @@ async def test_azure_rag_runtime_logs_with_correlation_id(monkeypatch: pytest.Mo
 
     answer = await runtime.answer("거실 스타일링을 알려줘", correlation_id="corr-123")
 
-    assert answer == "현재 수집된 LG 홈스타일 콘텐츠에서 해당 정보를 찾을 수 없습니다."
+    assert answer == DECLINE_MESSAGE
     assert events == [
         (
             "grounded_answer_started",
             {"correlation_id": "corr-123", "question_length": len("거실 스타일링을 알려줘")},
         ),
-        ("grounded_answer_completed", {"correlation_id": "corr-123", "answer_length": len(answer)}),
+        (
+            "grounded_answer_completed",
+            {"correlation_id": "corr-123", "answer_length": len(answer), "declined": True},
+        ),
     ]
 
 

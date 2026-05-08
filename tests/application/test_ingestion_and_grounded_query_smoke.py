@@ -114,5 +114,5 @@ async def test_smoke_path_ingests_sections_then_answers_from_retrieved_evidence(
 
     assert answer == (
         "렌더된 본문 근거입니다.\n\n"
-        "[1] https://homestyle.lge.co.kr/item?productId=G25070000210"
+        "[1] 렌더된 거실 컬렉션 - https://homestyle.lge.co.kr/item?productId=G25070000210"
     )

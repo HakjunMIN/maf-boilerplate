@@ -1,6 +1,9 @@
 import inspect
 
-from homestyle_agent.application.grounded_query import GroundedQueryService
+from azure.core.credentials import AzureKeyCredential
+from azure.core.credentials_async import AsyncTokenCredential
+
+from homestyle_agent.application.grounded_query import DECLINE_MESSAGE, GroundedQueryService
 from homestyle_agent.infrastructure.maf import MafGroundedBodyGenerator
 from homestyle_agent.infrastructure.retrieval import AzureSearchSectionRetriever
 from homestyle_shared.infrastructure.azure_identity import build_azure_credential
@@ -12,6 +15,8 @@ from homestyle_shared.infrastructure.observability import (
 )
 from homestyle_shared.infrastructure.openai import AzureOpenAIEmbedder
 from homestyle_shared.infrastructure.settings import AzureRagSettings
+
+_MAX_SEARCH_TOP = 5
 
 
 class AzureRagRuntime:
@@ -27,6 +32,7 @@ class AzureRagRuntime:
         )
         self._credential = build_azure_credential(
             use_developer_credentials=settings.use_developer_credentials,
+            azure_tenant_id=settings.azure_tenant_id,
             managed_identity_client_id=settings.managed_identity_client_id,
         )
         self._logger = logger or build_logger("azure_rag_runtime")
@@ -39,9 +45,9 @@ class AzureRagRuntime:
         self.retriever = AzureSearchSectionRetriever(
             endpoint=settings.azure_search_endpoint,
             index_name=settings.azure_search_index_name,
-            credential=self._credential,
+            credential=_build_search_credential(settings, self._credential),
             embed_query=self._embedder.embed_text,
-            top=settings.search_top,
+            top=min(settings.search_top, _MAX_SEARCH_TOP),
         )
         self.answer_generator = MafGroundedBodyGenerator(
             endpoint=settings.azure_openai_endpoint,
@@ -58,7 +64,11 @@ class AzureRagRuntime:
         logger, _ = bind_correlation_id(self._logger, correlation_id)
         logger.info("grounded_answer_started", question_length=len(question))
         answer = await self.grounded_query_service.answer(question)
-        logger.info("grounded_answer_completed", answer_length=len(answer))
+        logger.info(
+            "grounded_answer_completed",
+            answer_length=len(answer),
+            declined=answer == DECLINE_MESSAGE,
+        )
         return answer
 
     async def close(self) -> None:
@@ -74,3 +84,12 @@ async def _close_if_present(resource: object) -> None:
     result = close()
     if inspect.isawaitable(result):
         await result
+
+
+def _build_search_credential(
+    settings: AzureRagSettings,
+    token_credential: AsyncTokenCredential,
+) -> AzureKeyCredential | AsyncTokenCredential:
+    if settings.azure_search_admin_key:
+        return AzureKeyCredential(settings.azure_search_admin_key)
+    return token_credential

@@ -64,6 +64,7 @@ async def test_azure_search_section_retriever_normalizes_section_provenance(
     sections = await retriever.retrieve_sections("거실 스타일링을 알려줘")
 
     assert captured_search["top"] == 3
+    assert captured_search["filter"] == "locale eq 'ko'"
     assert captured_search["select"] == [
         "chunk_id",
         "page_url",
@@ -84,3 +85,45 @@ async def test_azure_search_section_retriever_normalizes_section_provenance(
     assert sections[0].reviewer_approved is True
 
     await retriever.close()
+
+
+@pytest.mark.asyncio
+async def test_azure_search_section_retriever_caps_top_at_five(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_search: dict[str, object] = {}
+
+    class FakeSearchResults:
+        def __aiter__(self) -> "FakeSearchResults":
+            return self
+
+        async def __anext__(self) -> dict[str, object]:
+            raise StopAsyncIteration
+
+    class FakeSearchClient:
+        def __init__(self, *, endpoint: str, index_name: str, credential: object) -> None:
+            return None
+
+        async def search(self, **kwargs: object) -> FakeSearchResults:
+            captured_search.update(kwargs)
+            return FakeSearchResults()
+
+    monkeypatch.setattr(
+        "homestyle_agent.infrastructure.retrieval.SearchClient",
+        FakeSearchClient,
+    )
+
+    async def embed_query(_: str) -> list[float]:
+        return [0.1, 0.2, 0.3]
+
+    retriever = AzureSearchSectionRetriever(
+        endpoint="https://search.example",
+        index_name="sections",
+        credential=object(),
+        embed_query=embed_query,
+        top=20,
+    )
+
+    await retriever.retrieve_sections("거실 스타일링을 알려줘")
+
+    assert captured_search["top"] == 5
