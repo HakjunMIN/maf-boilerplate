@@ -165,11 +165,28 @@ curl -X POST http://127.0.0.1:8080/ask \
   -d '{"question":"거실 스타일링을 알려줘"}'
 ```
 
-응답은 Azure AI Search에서 검색된 근거만 사용하며, 끝에 번호가 붙은 출처 URL과 섹션명을 포함한다. 후속 질문은 응답의 `session_id`를 다음 요청에 함께 보내 multi-turn 세션으로 이어갈 수 있다.
+HTTP API 대신 런타임 클래스를 직접 호출하려면 아래처럼 사용할 수 있다.
 
-수동 크롤/인덱싱 검증은 아래 문서를 참고하면 된다.
+```python
+import asyncio
 
-- [scripts/README.md](./scripts/README.md)
+from homestyle_agent import AzureRagRuntime
+from homestyle_shared.infrastructure.settings import AzureRagSettings, load_environment
+
+
+async def main() -> None:
+  settings = AzureRagSettings.from_env(load_environment())
+  runtime = AzureRagRuntime(settings)
+  try:
+    answer = await runtime.answer("거실 스타일링을 알려줘")
+    print(answer)
+  finally:
+    await runtime.close()
+
+
+if __name__ == "__main__":
+  asyncio.run(main())
+```
 
 ## 현재 프로젝트 원칙
 
@@ -179,7 +196,3 @@ curl -X POST http://127.0.0.1:8080/ask \
 - 근거가 없으면 모른다고 답한다.
 - 구현 변경은 가능한 한 테스트로 먼저 고정한다.
 - 과한 추상화보다 명시적인 구조를 우선한다.
-
-## 왜 README를 이렇게 구성했는가
-
-이 저장소의 가치는 단순히 “크롤러 하나 만들기”에 있지 않다. 인터뷰, PRD, 유비쿼터스 언어, TDD, triage, worktree, Azure AI, Agent Framework를 하나의 실전 개발 하네스로 엮어, 기능 구현보다 재현 가능한 개발 과정 자체를 남기는 데 의미가 있다.
