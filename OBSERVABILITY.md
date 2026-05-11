@@ -14,7 +14,7 @@
 
 ### 공통 진입점
 
-프로세스 시작 시점에 `configure_observability(...)`를 한 번 호출합니다.
+프로세스 시작 시점에 `configure_process_observability(...)`를 한 번 호출합니다.
 
 현재 적용 위치:
 
@@ -22,15 +22,15 @@
 - `src/homestyle_ingestion/manual_crawl_cli.py`
 - `scripts/sample_vlm_index.py`
 
-### `configure_observability(...)`가 하는 일
+### `configure_process_observability(...)`가 하는 일
 
 1. Python logging을 stdout으로 설정합니다.
 2. `structlog`를 JSON 로그 출력으로 설정합니다.
-3. 로드된 환경값에서 `OTEL_*`, `ENABLE_*` observability 변수를 프로세스 환경 변수로 복사합니다.
+3. 로드된 환경값에서 `OTEL_*`, `ENABLE_*` observability 변수를 프로세스 환경 변수로 복사합니다. 이 함수는 프로세스 전역 observability bootstrap이므로 이 부작용을 의도적으로 포함합니다.
 4. telemetry 백엔드 경로를 정확히 하나만 선택합니다.
-   - **Application Insights 경로**: `azure.monitor.opentelemetry.configure_azure_monitor(...)`를 호출한 뒤 `enable_instrumentation(enable_sensitive_data=False)`로 Agent Framework instrumentation을 켭니다.
-   - **OTLP 경로**: `agent_framework.observability.configure_otel_providers()`를 호출한 뒤 애플리케이션 로그용 OpenTelemetry logging handler를 붙입니다.
-   - **백엔드 미설정**: JSON 로그만 유지합니다.
+    - **Application Insights 경로**: `azure.monitor.opentelemetry.configure_azure_monitor(...)`를 호출한 뒤 `ENABLE_SENSITIVE_DATA` 값을 반영해 Agent Framework instrumentation을 켭니다.
+    - **OTLP 경로**: `agent_framework.observability.configure_otel_providers()`를 호출한 뒤 애플리케이션 로그용 OpenTelemetry logging handler를 붙입니다.
+    - **백엔드 미설정**: JSON 로그만 유지합니다.
 5. 혼합 설정을 거부합니다. `APPLICATION_INSIGHTS_CONNECTION_STRING`과 OTLP exporter 변수는 함께 사용할 수 없습니다.
 
 ### 로그 동작
@@ -58,7 +58,7 @@ APPLICATION_INSIGHTS_CONNECTION_STRING=InstrumentationKey=...;IngestionEndpoint=
 
 - Azure Monitor OpenTelemetry 파이프라인을 구성합니다.
 - Agent Framework instrumentation을 활성화합니다.
-- 민감한 데이터 수집은 꺼진 상태를 유지합니다.
+- 민감한 데이터 수집은 기본적으로 꺼진 상태를 유지합니다. 로컬/테스트에서 `ENABLE_SENSITIVE_DATA=true`를 명시한 경우에만 Agent Framework의 prompt, completion 등 민감 payload 수집을 허용합니다.
 - OTLP exporter 변수는 모두 비워야 합니다.
 
 ### 2. OTLP 백엔드
@@ -120,8 +120,8 @@ OTEL_EXPORTER_OTLP_HEADERS=
 
 주의:
 
-- 모든 `OTEL_*` 변수는 Agent Framework OTEL 설정 전에 프로세스 환경 변수로 전달됩니다.
-- `ENABLE_SENSITIVE_DATA`는 명시적인 로컬/테스트 opt-in 용도로만 두고, 현재 저장소 구현은 `enable_sensitive_data=False`로 instrumentation을 켭니다.
+- 모든 `OTEL_*` 및 `ENABLE_*` observability 변수는 Agent Framework OTEL 설정 전에 프로세스 환경 변수로 전달됩니다.
+- `ENABLE_SENSITIVE_DATA`는 명시적인 로컬/테스트 opt-in 용도로만 둡니다. Application Insights 경로에서는 `1`, `true`, `yes`, `on` 값을 `enable_sensitive_data=True`로 반영하고, 그 외 값은 비활성으로 처리합니다.
 - `APPLICATION_INSIGHTS_CONNECTION_STRING`과 OTLP exporter 변수는 함께 설정하지 마세요.
 
 ## 새 에이전트에서의 startup 패턴
@@ -133,11 +133,11 @@ OTEL_EXPORTER_OTLP_HEADERS=
 ```python
 import os
 
-from homestyle_shared.infrastructure.observability import configure_observability
+from homestyle_shared.infrastructure.observability import configure_process_observability
 
 
 def main() -> None:
-    configure_observability(
+    configure_process_observability(
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
         application_insights_connection_string=os.environ.get(
             "APPLICATION_INSIGHTS_CONNECTION_STRING"
@@ -257,7 +257,7 @@ run_logger.info("my_agent_started", task="sample")
 
 새 에이전트나 워커에 observability를 연결할 때 확인할 항목:
 
-1. `configure_observability(...)`가 startup에서 한 번만 호출되는지 확인합니다.
+1. `configure_process_observability(...)`가 startup에서 한 번만 호출되는지 확인합니다.
 2. JSON 로그가 stdout에 계속 출력되는지 확인합니다.
 3. 백엔드 경로가 하나만 활성화되어 있는지 확인합니다.
    - Application Insights 또는
@@ -274,7 +274,7 @@ run_logger.info("my_agent_started", task="sample")
 
 - `ENABLE_INSTRUMENTATION=true`
 - OTLP endpoint 변수가 실제로 하나 이상 설정되어 있는지
-- agent/runtime 생성 전에 `configure_observability(...)`가 호출되었는지
+- agent/runtime 생성 전에 `configure_process_observability(...)`가 호출되었는지
 
 ### `APPLICATION_INSIGHTS_CONNECTION_STRING` 관련 `ValueError`가 발생하는 경우
 

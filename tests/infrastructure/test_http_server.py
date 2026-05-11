@@ -6,7 +6,13 @@ from homestyle_shared.infrastructure import AzureRagSettings
 
 
 class FakeRuntime:
-    async def answer(self, question: str, *, correlation_id: str | None = None) -> str:
+    async def answer(
+        self,
+        question: str,
+        *,
+        correlation_id: str | None = None,
+        session_id: str | None = None,
+    ) -> str:
         return "authenticated answer"
 
 
@@ -22,7 +28,13 @@ class FakeConfiguredRuntime:
         self.settings = settings
         FakeConfiguredRuntime.captured_observability_environment = observability_environment
 
-    async def answer(self, question: str, *, correlation_id: str | None = None) -> str:
+    async def answer(
+        self,
+        question: str,
+        *,
+        correlation_id: str | None = None,
+        session_id: str | None = None,
+    ) -> str:
         return f"answer via {self.settings.azure_search_index_name}"
 
 

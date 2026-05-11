@@ -2,7 +2,8 @@ import importlib.metadata
 import logging
 import os
 import sys
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from typing import Protocol
 from uuid import uuid4
 
@@ -10,8 +11,10 @@ import structlog
 
 _AZURE_MONITOR_CONNECTION_STRING: str | None = None
 _AGENT_FRAMEWORK_OTEL_CONFIGURED = False
-_APPLICATION_OTEL_LOGGING_HANDLER_MARKER = "_homestyle_application_otel_logging_handler"
+_AGENT_FRAMEWORK_INSTRUMENTATION_ENABLED = False
+_APPLICATION_OTEL_LOGGING_HANDLER_MARKER = "_application_otel_logging_handler"
 _OTEL_INTERNAL_LOGGER_PREFIXES = ("opentelemetry.", "grpc")
+_DEFAULT_TRACER_NAME = __name__
 _OTLP_EXPORTER_ENV_VARS = (
     "OTEL_EXPORTER_OTLP_ENDPOINT",
     "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
@@ -31,12 +34,14 @@ class _ApplicationTelemetryLogFilter(logging.Filter):
         return not record.name.startswith(_OTEL_INTERNAL_LOGGER_PREFIXES)
 
 
-def configure_observability(
+def configure_process_observability(
     *,
     log_level: str = "INFO",
     application_insights_connection_string: str | None = None,
     env: Mapping[str, str] | None = None,
+    reset_logging: bool = True,
 ) -> None:
+    global _AZURE_MONITOR_CONNECTION_STRING
     values = os.environ if env is None else env
     _apply_agent_framework_observability_env(values)
     if application_insights_connection_string:
@@ -47,7 +52,7 @@ def configure_observability(
         level=resolved_level,
         format="%(message)s",
         stream=sys.stdout,
-        force=True,
+        force=reset_logging,
     )
     structlog.configure(
         processors=[
@@ -64,8 +69,12 @@ def configure_observability(
         cache_logger_on_first_use=True,
     )
     if application_insights_connection_string:
-        _configure_azure_monitor(application_insights_connection_string)
-        _enable_agent_framework_instrumentation()
+        if _AZURE_MONITOR_CONNECTION_STRING != application_insights_connection_string:
+            _configure_azure_monitor(application_insights_connection_string)
+            _AZURE_MONITOR_CONNECTION_STRING = application_insights_connection_string
+        _enable_agent_framework_instrumentation_once(
+            enable_sensitive_data=_is_enabled(values.get("ENABLE_SENSITIVE_DATA", "")),
+        )
     elif _has_otlp_exporter_configuration(values):
         _configure_agent_framework_otel_once()
         _attach_application_otel_logging_handler(resolved_level)
@@ -81,6 +90,30 @@ def bind_correlation_id(
 ) -> tuple[StructuredLogger, str]:
     resolved_correlation_id = correlation_id or str(uuid4())
     return logger.bind(correlation_id=resolved_correlation_id), resolved_correlation_id
+
+
+@contextmanager
+def start_request_span(
+    name: str,
+    *,
+    tracer_name: str = _DEFAULT_TRACER_NAME,
+    attributes: Mapping[str, object] | None = None,
+) -> Iterator["_RequestSpan"]:
+    from opentelemetry import trace
+
+    resolved_tracer_name = tracer_name.strip() if tracer_name.strip() else _DEFAULT_TRACER_NAME
+    tracer = trace.get_tracer(resolved_tracer_name)
+    with tracer.start_as_current_span(name) as span:
+        if attributes:
+            for key, value in attributes.items():
+                if value is None:
+                    continue
+                span.set_attribute(key, value)
+        yield span
+
+
+class _RequestSpan(Protocol):
+    def set_attribute(self, key: str, value: object) -> None: ...
 
 
 def _resolve_log_level(log_level: str) -> int:
@@ -120,6 +153,15 @@ def _configure_agent_framework_otel_once() -> None:
     _AGENT_FRAMEWORK_OTEL_CONFIGURED = True
 
 
+def _enable_agent_framework_instrumentation_once(*, enable_sensitive_data: bool) -> None:
+    global _AGENT_FRAMEWORK_INSTRUMENTATION_ENABLED
+    if _AGENT_FRAMEWORK_INSTRUMENTATION_ENABLED:
+        return
+
+    _enable_agent_framework_instrumentation(enable_sensitive_data)
+    _AGENT_FRAMEWORK_INSTRUMENTATION_ENABLED = True
+
+
 def _configure_agent_framework_otel_providers() -> None:
     _patch_agent_framework_version()
     from agent_framework.observability import configure_otel_providers
@@ -143,11 +185,11 @@ def _attach_application_otel_logging_handler(level: int) -> None:
     root_logger.addHandler(handler)
 
 
-def _enable_agent_framework_instrumentation() -> None:
+def _enable_agent_framework_instrumentation(enable_sensitive_data: bool) -> None:
     _patch_agent_framework_version()
     from agent_framework.observability import enable_instrumentation
 
-    enable_instrumentation(enable_sensitive_data=False)
+    enable_instrumentation(enable_sensitive_data=enable_sensitive_data)
 
 
 def _patch_agent_framework_version() -> None:
@@ -164,6 +206,10 @@ def _has_otlp_exporter_configuration(env: Mapping[str, str]) -> bool:
 
 def _configured_otlp_exporter_env_vars(env: Mapping[str, str]) -> list[str]:
     return [name for name in _OTLP_EXPORTER_ENV_VARS if env.get(name, "").strip()]
+
+
+def _is_enabled(value: str) -> bool:
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _apply_agent_framework_observability_env(env: Mapping[str, str]) -> None:

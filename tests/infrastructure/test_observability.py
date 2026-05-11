@@ -3,7 +3,11 @@ import logging
 
 import pytest
 
-from homestyle_shared.infrastructure.observability import build_logger, configure_observability
+from homestyle_shared.infrastructure.observability import (
+    build_logger,
+    configure_process_observability,
+    start_request_span,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -22,10 +26,16 @@ def isolate_observability_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "homestyle_shared.infrastructure.observability._AGENT_FRAMEWORK_OTEL_CONFIGURED",
         False,
     )
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._AGENT_FRAMEWORK_INSTRUMENTATION_ENABLED",
+        False,
+    )
 
 
-def test_configure_observability_emits_json_logs(capsys: pytest.CaptureFixture[str]) -> None:
-    configure_observability(log_level="DEBUG")
+def test_configure_process_observability_emits_json_logs(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    configure_process_observability(log_level="DEBUG")
 
     logger = build_logger("test_logger").bind(correlation_id="corr-123")
     logger.info("test_event", value=1)
@@ -37,7 +47,9 @@ def test_configure_observability_emits_json_logs(capsys: pytest.CaptureFixture[s
     assert '"logger": "test_logger"' in output
 
 
-def test_configure_observability_initializes_azure_monitor(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_configure_process_observability_initializes_azure_monitor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     captured_connection_strings: list[str] = []
 
     monkeypatch.setattr(
@@ -49,7 +61,7 @@ def test_configure_observability_initializes_azure_monitor(monkeypatch: pytest.M
         captured_connection_strings.append,
     )
 
-    configure_observability(
+    configure_process_observability(
         log_level="INFO",
         application_insights_connection_string="InstrumentationKey=test",
     )
@@ -57,10 +69,10 @@ def test_configure_observability_initializes_azure_monitor(monkeypatch: pytest.M
     assert captured_connection_strings == ["InstrumentationKey=test"]
 
 
-def test_configure_observability_enables_agent_framework_instrumentation_for_app_insights(
+def test_configure_process_observability_enables_agent_framework_instrumentation_for_app_insights(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: list[str] = []
+    calls: list[object] = []
 
     monkeypatch.setattr(
         "homestyle_shared.infrastructure.observability._AZURE_MONITOR_CONNECTION_STRING",
@@ -72,28 +84,57 @@ def test_configure_observability_enables_agent_framework_instrumentation_for_app
     )
     monkeypatch.setattr(
         "homestyle_shared.infrastructure.observability._enable_agent_framework_instrumentation",
-        lambda: calls.append("enable_instrumentation"),
+        calls.append,
     )
 
-    configure_observability(
+    configure_process_observability(
+        application_insights_connection_string="InstrumentationKey=test",
+    )
+    configure_process_observability(
         application_insights_connection_string="InstrumentationKey=test",
     )
 
-    assert calls == ["azure_monitor", "enable_instrumentation"]
+    assert calls == ["azure_monitor", False]
 
 
-def test_configure_observability_rejects_app_insights_with_otlp_exporter(
+def test_configure_process_observability_passes_sensitive_data_env_to_agent_framework(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_sensitive_data_values: list[bool] = []
+
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._AZURE_MONITOR_CONNECTION_STRING",
+        None,
+    )
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._configure_azure_monitor",
+        lambda _: None,
+    )
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._enable_agent_framework_instrumentation",
+        captured_sensitive_data_values.append,
+    )
+
+    configure_process_observability(
+        application_insights_connection_string="InstrumentationKey=test",
+        env={"ENABLE_SENSITIVE_DATA": "true"},
+    )
+
+    assert captured_sensitive_data_values == [True]
+
+
+def test_configure_process_observability_rejects_app_insights_with_otlp_exporter(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
 
     with pytest.raises(ValueError, match="APPLICATION_INSIGHTS_CONNECTION_STRING"):
-        configure_observability(
+        configure_process_observability(
             application_insights_connection_string="InstrumentationKey=test",
         )
 
 
-def test_configure_observability_configures_agent_framework_otel_for_otlp(
+def test_configure_process_observability_configures_agent_framework_otel_for_otlp(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[str] = []
@@ -112,12 +153,12 @@ def test_configure_observability_configures_agent_framework_otel_for_otlp(
         lambda _: calls.append("attach_application_logging"),
     )
 
-    configure_observability()
+    configure_process_observability()
 
     assert calls == ["configure_otel_providers", "attach_application_logging"]
 
 
-def test_configure_observability_applies_otlp_values_from_dotenv_mapping(
+def test_configure_process_observability_applies_otlp_values_from_dotenv_mapping(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[str] = []
@@ -137,7 +178,7 @@ def test_configure_observability_applies_otlp_values_from_dotenv_mapping(
         lambda _: calls.append("attach_application_logging"),
     )
 
-    configure_observability(
+    configure_process_observability(
         env={
             "ENABLE_INSTRUMENTATION": "true",
             "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4317",
@@ -194,3 +235,49 @@ def test_attach_application_otel_logging_handler_adds_one_root_handler(
         )
     finally:
         root_logger.handlers = original_handlers
+
+
+def test_start_request_span_sets_attributes_and_skips_none(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from contextlib import contextmanager
+
+    captured_span_names: list[str] = []
+    captured_tracer_names: list[str] = []
+    set_calls: list[tuple[str, object]] = []
+
+    class FakeSpan:
+        def set_attribute(self, key: str, value: object) -> None:
+            set_calls.append((key, value))
+
+    class FakeTracer:
+        @contextmanager
+        def start_as_current_span(self, name: str):
+            captured_span_names.append(name)
+            yield FakeSpan()
+
+    def fake_get_tracer(name: str) -> FakeTracer:
+        captured_tracer_names.append(name)
+        return FakeTracer()
+
+    monkeypatch.setattr("opentelemetry.trace.get_tracer", fake_get_tracer)
+
+    with start_request_span(
+        "homestyle.agent.answer",
+        tracer_name="homestyle_agent.runtime",
+        attributes={
+            "homestyle.correlation_id": "corr-1",
+            "homestyle.session_id": "sess-1",
+            "homestyle.skipped": None,
+            "homestyle.empty": "",
+        },
+    ) as span:
+        span.set_attribute("homestyle.outcome", "answered")
+
+    assert captured_span_names == ["homestyle.agent.answer"]
+    assert captured_tracer_names == ["homestyle_agent.runtime"]
+    assert ("homestyle.correlation_id", "corr-1") in set_calls
+    assert ("homestyle.session_id", "sess-1") in set_calls
+    assert ("homestyle.empty", "") in set_calls
+    assert ("homestyle.outcome", "answered") in set_calls
+    assert all(key != "homestyle.skipped" for key, _ in set_calls)

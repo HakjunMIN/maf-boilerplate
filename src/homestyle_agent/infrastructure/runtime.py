@@ -12,7 +12,8 @@ from homestyle_shared.infrastructure.observability import (
     StructuredLogger,
     bind_correlation_id,
     build_logger,
-    configure_observability,
+    configure_process_observability,
+    start_request_span,
 )
 from homestyle_shared.infrastructure.openai import AzureOpenAIEmbedder
 from homestyle_shared.infrastructure.settings import AzureRagSettings
@@ -28,7 +29,7 @@ class AzureRagRuntime:
         logger: StructuredLogger | None = None,
         observability_environment: Mapping[str, str] | None = None,
     ) -> None:
-        configure_observability(
+        configure_process_observability(
             log_level=settings.log_level,
             application_insights_connection_string=settings.application_insights_connection_string,
             env=observability_environment,
@@ -63,16 +64,34 @@ class AzureRagRuntime:
             generate_grounded_body=self.answer_generator.generate_grounded_body,
         )
 
-    async def answer(self, question: str, *, correlation_id: str | None = None) -> str:
-        logger, _ = bind_correlation_id(self._logger, correlation_id)
-        logger.info("grounded_answer_started", question_length=len(question))
-        answer = await self.grounded_query_service.answer(question)
-        logger.info(
-            "grounded_answer_completed",
-            answer_length=len(answer),
-            declined=answer == DECLINE_MESSAGE,
-        )
-        return answer
+    async def answer(
+        self,
+        question: str,
+        *,
+        correlation_id: str | None = None,
+        session_id: str | None = None,
+    ) -> str:
+        logger, resolved_correlation_id = bind_correlation_id(self._logger, correlation_id)
+        span_attributes: dict[str, object] = {
+            "homestyle.correlation_id": resolved_correlation_id,
+        }
+        if session_id:
+            span_attributes["homestyle.session_id"] = session_id
+        with start_request_span(
+            "homestyle.agent.answer",
+            tracer_name="homestyle_agent.runtime",
+            attributes=span_attributes,
+        ) as span:
+            logger.info("grounded_answer_started", question_length=len(question))
+            answer = await self.grounded_query_service.answer(question)
+            declined = answer == DECLINE_MESSAGE
+            span.set_attribute("homestyle.outcome", "declined" if declined else "answered")
+            logger.info(
+                "grounded_answer_completed",
+                answer_length=len(answer),
+                declined=declined,
+            )
+            return answer
 
     async def close(self) -> None:
         await self.retriever.close()

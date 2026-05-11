@@ -22,7 +22,13 @@ def _json_dumps(value: object) -> str:
 
 
 class AnswerRuntime(Protocol):
-    async def answer(self, question: str, *, correlation_id: str | None = None) -> str:
+    async def answer(
+        self,
+        question: str,
+        *,
+        correlation_id: str | None = None,
+        session_id: str | None = None,
+    ) -> str:
         raise NotImplementedError
 
 
@@ -82,7 +88,11 @@ async def _handle_ask(request: web.Request) -> web.Response:
     session_id = session_store.ensure_session(requested_session_id)
     runtime = request.app[_RUNTIME_KEY]
     try:
-        answer = await runtime.answer(question, correlation_id=session_id)
+        answer = await runtime.answer(
+            question,
+            correlation_id=session_id,
+            session_id=session_id,
+        )
     except Exception as error:
         _LOGGER.warning(
             "answer_generation_failed",

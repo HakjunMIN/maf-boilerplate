@@ -311,6 +311,111 @@ async def test_azure_rag_runtime_logs_with_correlation_id(monkeypatch: pytest.Mo
     ]
 
 
+@pytest.mark.asyncio
+async def test_azure_rag_runtime_records_span_attributes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from contextlib import contextmanager
+
+    span_calls: list[tuple[str, str, dict[str, object]]] = []
+    set_calls: list[tuple[str, object]] = []
+
+    class RecordingSpan:
+        def set_attribute(self, key: str, value: object) -> None:
+            set_calls.append((key, value))
+
+    @contextmanager
+    def fake_start_request_span(name: str, *, tracer_name: str, attributes=None):
+        span_calls.append((name, tracer_name, dict(attributes or {})))
+        yield RecordingSpan()
+
+    monkeypatch.setattr(
+        "homestyle_agent.infrastructure.runtime.start_request_span",
+        fake_start_request_span,
+    )
+
+    class FakeCredential:
+        pass
+
+    class FakeEmbedder:
+        def __init__(self, **_: object) -> None:
+            return None
+
+        async def embed_text(self, text: str) -> list[float]:
+            return [0.0]
+
+        async def close(self) -> None:
+            return None
+
+    class FakeRetriever:
+        def __init__(self, **_: object) -> None:
+            return None
+
+        async def retrieve_sections(self, _: str) -> list[SectionDocument]:
+            return []
+
+        async def close(self) -> None:
+            return None
+
+    class FakeGenerator:
+        def __init__(self, **_: object) -> None:
+            return None
+
+        async def generate_grounded_body(
+            self,
+            question: str,
+            sections: list[SectionDocument],
+        ) -> str:
+            return ""
+
+    monkeypatch.setattr(
+        "homestyle_agent.infrastructure.runtime.build_azure_credential",
+        lambda **_: FakeCredential(),
+    )
+    monkeypatch.setattr(
+        "homestyle_agent.infrastructure.runtime.AzureOpenAIEmbedder",
+        FakeEmbedder,
+    )
+    monkeypatch.setattr(
+        "homestyle_agent.infrastructure.runtime.AzureSearchSectionRetriever",
+        FakeRetriever,
+    )
+    monkeypatch.setattr(
+        "homestyle_agent.infrastructure.runtime.MafGroundedBodyGenerator",
+        FakeGenerator,
+    )
+
+    settings = AzureRagSettings(
+        azure_openai_endpoint="https://openai.example",
+        azure_openai_api_version="2025-07-01-preview",
+        azure_openai_chat_deployment="chat-deployment",
+        azure_openai_embedding_deployment="embedding-deployment",
+        azure_openai_vision_deployment="vision-deployment",
+        azure_search_endpoint="https://search.example",
+        azure_search_index_name="sections",
+    )
+    runtime = AzureRagRuntime(settings)
+
+    answer = await runtime.answer(
+        "거실 스타일링을 알려줘",
+        correlation_id="corr-xyz",
+        session_id="sess-abc",
+    )
+
+    assert answer == DECLINE_MESSAGE
+    assert span_calls == [
+        (
+            "homestyle.agent.answer",
+            "homestyle_agent.runtime",
+            {
+                "homestyle.correlation_id": "corr-xyz",
+                "homestyle.session_id": "sess-abc",
+            },
+        )
+    ]
+    assert ("homestyle.outcome", "declined") in set_calls
+
+
 def test_azure_rag_runtime_configures_observability_from_settings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -351,7 +456,7 @@ def test_azure_rag_runtime_configures_observability_from_settings(
             return ""
 
     monkeypatch.setattr(
-        "homestyle_agent.infrastructure.runtime.configure_observability",
+        "homestyle_agent.infrastructure.runtime.configure_process_observability",
         lambda **kwargs: captured_configuration.update(kwargs),
     )
     monkeypatch.setattr(

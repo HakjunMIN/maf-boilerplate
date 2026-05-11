@@ -8,14 +8,28 @@ from homestyle_agent.api import InMemorySessionStore, create_app
 class FakeRuntime:
     def __init__(self) -> None:
         self.questions: list[str] = []
+        self.calls: list[dict[str, str | None]] = []
 
-    async def answer(self, question: str, *, correlation_id: str | None = None) -> str:
+    async def answer(
+        self,
+        question: str,
+        *,
+        correlation_id: str | None = None,
+        session_id: str | None = None,
+    ) -> str:
         self.questions.append(question)
+        self.calls.append({"correlation_id": correlation_id, "session_id": session_id})
         return f"answer for {question}"
 
 
 class FailingRuntime:
-    async def answer(self, question: str, *, correlation_id: str | None = None) -> str:
+    async def answer(
+        self,
+        question: str,
+        *,
+        correlation_id: str | None = None,
+        session_id: str | None = None,
+    ) -> str:
         raise RuntimeError("Token tenant does not match resource tenant")
 
 
@@ -47,6 +61,9 @@ async def test_http_api_answers_and_creates_session() -> None:
     assert isinstance(body["session_id"], str)
     assert body["turn_count"] == 1
     assert runtime.questions == ["거실 스타일링을 알려줘"]
+    assert runtime.calls == [
+        {"correlation_id": body["session_id"], "session_id": body["session_id"]}
+    ]
 
 
 @pytest.mark.asyncio

@@ -21,7 +21,7 @@ from homestyle_ingestion.infrastructure.rendering import PlaywrightPageRenderer
 from homestyle_ingestion.infrastructure.storage import LocalPageStore
 from homestyle_shared.domain.indexing import SectionDocument
 from homestyle_shared.infrastructure.azure_identity import build_azure_credential
-from homestyle_shared.infrastructure.observability import configure_observability
+from homestyle_shared.infrastructure.observability import configure_process_observability
 from homestyle_shared.infrastructure.openai import AzureOpenAIVisionExtractor
 
 
@@ -34,7 +34,7 @@ _SUPPORTED_IMAGE_CONTENT_TYPES = {
 
 
 def main() -> None:
-    configure_observability(
+    configure_process_observability(
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
         application_insights_connection_string=os.environ.get(
             "APPLICATION_INSIGHTS_CONNECTION_STRING"

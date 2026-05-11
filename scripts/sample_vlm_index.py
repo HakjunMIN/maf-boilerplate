@@ -43,7 +43,7 @@ from homestyle_ingestion.infrastructure.rendering import PlaywrightPageRenderer 
 from homestyle_ingestion.infrastructure.storage import LocalPageStore  # noqa: E402
 from homestyle_shared.domain.indexing import SectionDocument  # noqa: E402
 from homestyle_shared.infrastructure.azure_identity import build_azure_credential  # noqa: E402
-from homestyle_shared.infrastructure.observability import bind_correlation_id, build_logger, configure_observability  # noqa: E402
+from homestyle_shared.infrastructure.observability import bind_correlation_id, build_logger, configure_process_observability  # noqa: E402
 from homestyle_shared.infrastructure.openai import AzureOpenAIEmbedder, AzureOpenAIVisionExtractor  # noqa: E402
 
 
@@ -51,7 +51,7 @@ logger = build_logger("sample_vlm_index")
 
 
 def main() -> None:
-    configure_observability(
+    configure_process_observability(
         log_level=os.environ.get("LOG_LEVEL", "INFO"),
         application_insights_connection_string=os.environ.get(
             "APPLICATION_INSIGHTS_CONNECTION_STRING"
