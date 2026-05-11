@@ -11,8 +11,16 @@ class FakeRuntime:
 
 
 class FakeConfiguredRuntime:
-    def __init__(self, settings: AzureRagSettings) -> None:
+    captured_observability_environment: dict[str, str] | None = None
+
+    def __init__(
+        self,
+        settings: AzureRagSettings,
+        *,
+        observability_environment: dict[str, str] | None = None,
+    ) -> None:
         self.settings = settings
+        FakeConfiguredRuntime.captured_observability_environment = observability_environment
 
     async def answer(self, question: str, *, correlation_id: str | None = None) -> str:
         return f"answer via {self.settings.azure_search_index_name}"
@@ -101,6 +109,7 @@ async def test_build_app_from_env_loads_root_dotenv_when_running_from_src(
         "AZURE_SEARCH_ENDPOINT=https://search.example\n"
         "AZURE_SEARCH_INDEX_NAME=sections-from-dotenv\n"
         "HOMESTYLE_AGENT_BEARER_TOKEN=expected-token\n"
+        "OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317\n"
     )
     monkeypatch.chdir(source_dir)
     monkeypatch.setattr(
@@ -123,3 +132,9 @@ async def test_build_app_from_env_loads_root_dotenv_when_running_from_src(
 
     assert response.status == 200
     assert body["answer"] == "answer via sections-from-dotenv"
+    assert FakeConfiguredRuntime.captured_observability_environment is not None
+    assert FakeConfiguredRuntime.captured_observability_environment[
+        "OTEL_EXPORTER_OTLP_ENDPOINT"
+    ] == (
+        "http://localhost:4317"
+    )

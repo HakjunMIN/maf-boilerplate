@@ -1,4 +1,5 @@
 import inspect
+from collections.abc import Mapping
 
 from azure.core.credentials import AzureKeyCredential
 from azure.core.credentials_async import AsyncTokenCredential
@@ -25,10 +26,12 @@ class AzureRagRuntime:
         settings: AzureRagSettings,
         *,
         logger: StructuredLogger | None = None,
+        observability_environment: Mapping[str, str] | None = None,
     ) -> None:
         configure_observability(
             log_level=settings.log_level,
             application_insights_connection_string=settings.application_insights_connection_string,
+            env=observability_environment,
         )
         self._credential = build_azure_credential(
             use_developer_credentials=settings.use_developer_credentials,

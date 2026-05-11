@@ -7,6 +7,24 @@ from homestyle_shared.domain import SectionDocument
 from homestyle_shared.infrastructure import AzureRagSettings
 
 
+@pytest.fixture(autouse=True)
+def isolate_runtime_observability_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in (
+        "ENABLE_CONSOLE_EXPORTERS",
+        "ENABLE_INSTRUMENTATION",
+        "ENABLE_SENSITIVE_DATA",
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._AGENT_FRAMEWORK_OTEL_CONFIGURED",
+        False,
+    )
+
+
 @pytest.mark.asyncio
 async def test_azure_rag_runtime_answers_and_closes_via_public_seam(
     monkeypatch: pytest.MonkeyPatch,
@@ -370,4 +388,5 @@ def test_azure_rag_runtime_configures_observability_from_settings(
     assert captured_configuration == {
         "log_level": "DEBUG",
         "application_insights_connection_string": "InstrumentationKey=test",
+        "env": None,
     }

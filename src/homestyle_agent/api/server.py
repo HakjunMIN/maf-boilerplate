@@ -16,7 +16,7 @@ def build_app_from_env(env: Mapping[str, str] | None = None) -> web.Application:
     settings = AzureRagSettings.from_env(values)
     token = _read_required_token(values)
     return create_app(
-        runtime=AzureRagRuntime(settings),
+        runtime=AzureRagRuntime(settings, observability_environment=values),
         session_store=InMemorySessionStore(),
         authenticate_request=bearer_token_auth(token),
     )

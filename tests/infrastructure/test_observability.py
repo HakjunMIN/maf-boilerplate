@@ -1,6 +1,27 @@
+import os
+import logging
+
 import pytest
 
 from homestyle_shared.infrastructure.observability import build_logger, configure_observability
+
+
+@pytest.fixture(autouse=True)
+def isolate_observability_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in (
+        "ENABLE_CONSOLE_EXPORTERS",
+        "ENABLE_INSTRUMENTATION",
+        "ENABLE_SENSITIVE_DATA",
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._AGENT_FRAMEWORK_OTEL_CONFIGURED",
+        False,
+    )
 
 
 def test_configure_observability_emits_json_logs(capsys: pytest.CaptureFixture[str]) -> None:
@@ -34,3 +55,142 @@ def test_configure_observability_initializes_azure_monitor(monkeypatch: pytest.M
     )
 
     assert captured_connection_strings == ["InstrumentationKey=test"]
+
+
+def test_configure_observability_enables_agent_framework_instrumentation_for_app_insights(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._AZURE_MONITOR_CONNECTION_STRING",
+        None,
+    )
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._configure_azure_monitor",
+        lambda _: calls.append("azure_monitor"),
+    )
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._enable_agent_framework_instrumentation",
+        lambda: calls.append("enable_instrumentation"),
+    )
+
+    configure_observability(
+        application_insights_connection_string="InstrumentationKey=test",
+    )
+
+    assert calls == ["azure_monitor", "enable_instrumentation"]
+
+
+def test_configure_observability_rejects_app_insights_with_otlp_exporter(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+
+    with pytest.raises(ValueError, match="APPLICATION_INSIGHTS_CONNECTION_STRING"):
+        configure_observability(
+            application_insights_connection_string="InstrumentationKey=test",
+        )
+
+
+def test_configure_observability_configures_agent_framework_otel_for_otlp(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._AGENT_FRAMEWORK_OTEL_CONFIGURED",
+        False,
+    )
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._configure_agent_framework_otel_providers",
+        lambda: calls.append("configure_otel_providers"),
+    )
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._attach_application_otel_logging_handler",
+        lambda _: calls.append("attach_application_logging"),
+    )
+
+    configure_observability()
+
+    assert calls == ["configure_otel_providers", "attach_application_logging"]
+
+
+def test_configure_observability_applies_otlp_values_from_dotenv_mapping(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    monkeypatch.delenv("ENABLE_INSTRUMENTATION", raising=False)
+    monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._AGENT_FRAMEWORK_OTEL_CONFIGURED",
+        False,
+    )
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._configure_agent_framework_otel_providers",
+        lambda: calls.append("configure_otel_providers"),
+    )
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._attach_application_otel_logging_handler",
+        lambda _: calls.append("attach_application_logging"),
+    )
+
+    configure_observability(
+        env={
+            "ENABLE_INSTRUMENTATION": "true",
+            "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4317",
+        },
+    )
+
+    assert calls == ["configure_otel_providers", "attach_application_logging"]
+    assert os.environ["ENABLE_INSTRUMENTATION"] == "true"
+    assert os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] == "http://localhost:4317"
+
+
+def test_attach_application_otel_logging_handler_adds_one_root_handler(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from homestyle_shared.infrastructure.observability import (
+        _ApplicationTelemetryLogFilter,
+        _APPLICATION_OTEL_LOGGING_HANDLER_MARKER,
+        _attach_application_otel_logging_handler,
+    )
+
+    captured_providers: list[object] = []
+    fake_provider = object()
+
+    class FakeLoggingHandler(logging.Handler):
+        def __init__(self, *, level: int, logger_provider: object) -> None:
+            super().__init__(level)
+            captured_providers.append(logger_provider)
+
+    root_logger = logging.getLogger()
+    original_handlers = list(root_logger.handlers)
+    root_logger.handlers = []
+    monkeypatch.setattr("opentelemetry._logs.get_logger_provider", lambda: fake_provider)
+    monkeypatch.setattr("opentelemetry.sdk._logs.LoggingHandler", FakeLoggingHandler)
+    try:
+        _attach_application_otel_logging_handler(logging.INFO)
+        _attach_application_otel_logging_handler(logging.DEBUG)
+
+        marked_handlers = [
+            handler
+            for handler in root_logger.handlers
+            if getattr(handler, _APPLICATION_OTEL_LOGGING_HANDLER_MARKER, False)
+        ]
+        assert len(marked_handlers) == 1
+        assert marked_handlers[0].level == logging.DEBUG
+        assert captured_providers == [fake_provider]
+        log_filter = next(
+            filter_item
+            for filter_item in marked_handlers[0].filters
+            if isinstance(filter_item, _ApplicationTelemetryLogFilter)
+        )
+        assert log_filter.filter(logging.LogRecord("app", logging.INFO, "", 1, "", (), None))
+        assert not log_filter.filter(
+            logging.LogRecord("opentelemetry.exporter", logging.INFO, "", 1, "", (), None)
+        )
+    finally:
+        root_logger.handlers = original_handlers
