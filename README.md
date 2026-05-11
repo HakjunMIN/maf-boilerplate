@@ -104,6 +104,7 @@ src/
 tests/
   application/        # 유스케이스/파이프라인 테스트
   infrastructure/     # 외부 경계 어댑터 테스트
+  e2e/                # HTTP API 수동 E2E 검증용 요청 세트
 config/
   discovery.toml      # 크롤 대상 설정
 ```
@@ -163,6 +164,25 @@ curl -X POST http://127.0.0.1:8080/ask \
   -H "Authorization: Bearer $HOMESTYLE_AGENT_BEARER_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"question":"거실 스타일링을 알려줘"}'
+```
+
+질문 세트 기반 E2E curl 검증:
+
+```bash
+jq -c '.questions[]' tests/e2e/observability_questions.json | while IFS= read -r item; do
+  id=$(printf '%s' "$item" | jq -r '.id')
+  question=$(printf '%s' "$item" | jq -r '.question')
+  body=$(jq -nc --arg question "$question" '{question: $question}')
+  response=$(curl -sS --connect-timeout 5 --max-time 90 -w '\n%{http_code}' \
+    -X POST http://127.0.0.1:8080/ask \
+    -H "Authorization: Bearer $HOMESTYLE_AGENT_BEARER_TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "$body")
+  http_status=${response##*$'\n'}
+  response_body=${response%$'\n'*}
+  summary=$(printf '%s' "$response_body" | jq -r '.answer // .detail // .title // .' 2>/dev/null | tr '\n' ' ' | cut -c1-180)
+  printf '[%s] HTTP %s %s\n  %s\n' "$id" "$http_status" "$question" "$summary"
+done
 ```
 
 HTTP API 대신 런타임 클래스를 직접 호출하려면 아래처럼 사용할 수 있다.
