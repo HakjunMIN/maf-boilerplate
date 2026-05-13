@@ -13,4 +13,5 @@ backend/.coverage
 frontend/node_modules/
 frontend/dist/
 .*crawl*/
+.eval/
 skills-lock.json

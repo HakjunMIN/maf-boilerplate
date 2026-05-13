@@ -22,7 +22,7 @@ class GroundedQueryService:
         self._generate_grounded_body = generate_grounded_body
 
     async def answer(self, question: str) -> str:
-        sections = _deduplicate_sections(_filter_acceptable_sections(await self._retrieve_sections(question)))
+        sections = select_grounding_sections(await self._retrieve_sections(question))
         if not sections:
             return DECLINE_MESSAGE
         body = _strip_visible_urls(await self._generate_grounded_body(question, sections))
@@ -31,6 +31,10 @@ class GroundedQueryService:
             for index, section in enumerate(sections, start=1)
         ]
         return f"{body}\n\n" + "\n".join(citations)
+
+
+def select_grounding_sections(sections: list[SectionDocument]) -> list[SectionDocument]:
+    return _deduplicate_sections(_filter_acceptable_sections(sections))
 
 
 def _filter_acceptable_sections(sections: list[SectionDocument]) -> list[SectionDocument]:
