@@ -12,6 +12,7 @@ from typing import Any
 from aiohttp import ClientSession, ClientTimeout
 from azure.core.credentials import AzureKeyCredential
 from azure.core.credentials_async import AsyncTokenCredential
+from azure.core.exceptions import ResourceNotFoundError
 from azure.identity import AzureCliCredential as SyncAzureCliCredential
 from azure.identity import DefaultAzureCredential as SyncDefaultAzureCredential
 from azure.identity import ManagedIdentityCredential as SyncManagedIdentityCredential
@@ -111,6 +112,11 @@ def parse_args() -> argparse.Namespace:
         help="Only write the JSONL dataset; do not run Azure AI Evaluation.",
     )
     parser.add_argument(
+        "--reuse-dataset",
+        action="store_true",
+        help="Use the existing JSONL dataset in --output-dir and skip /ask dataset generation.",
+    )
+    parser.add_argument(
         "--foundry-upload-mode",
         choices=FOUNDRY_UPLOAD_MODES,
         default="cloud",
@@ -165,45 +171,49 @@ async def main() -> None:
         print_foundry_run_summary("Started Foundry trace evaluation", trace_run)
         return
 
-    questions, configured_endpoint = load_questions(args.questions)
-    endpoint = args.ask_endpoint or configured_endpoint or "http://127.0.0.1:8080/ask"
     paths = make_eval_paths(args.output_dir)
 
-    async_credential = build_azure_credential(
-        use_developer_credentials=settings.use_developer_credentials,
-        azure_tenant_id=settings.azure_tenant_id,
-        managed_identity_client_id=settings.managed_identity_client_id,
-    )
-    embedder = AzureOpenAIEmbedder(
-        endpoint=settings.azure_openai_endpoint,
-        deployment=settings.azure_openai_embedding_deployment,
-        api_version=settings.azure_openai_api_version,
-        credential=async_credential,
-    )
-    retriever = AzureSearchSectionRetriever(
-        endpoint=settings.azure_search_endpoint,
-        index_name=settings.azure_search_index_name,
-        credential=build_search_credential(settings, async_credential),
-        embed_query=embedder.embed_text,
-        top=settings.search_top,
-    )
-
-    try:
-        rows = await build_eval_rows(
-            questions=questions,
-            endpoint=endpoint,
-            env=env,
-            retriever=retriever,
-            timeout_seconds=args.timeout_seconds,
-            max_context_chars=args.max_context_chars,
+    if args.reuse_dataset:
+        rows = read_jsonl(paths.dataset_path)
+        print(f"Reusing {len(rows)} eval rows from {paths.dataset_path}")
+    else:
+        questions, configured_endpoint = load_questions(args.questions)
+        endpoint = args.ask_endpoint or configured_endpoint or "http://127.0.0.1:8080/ask"
+        async_credential = build_azure_credential(
+            use_developer_credentials=settings.use_developer_credentials,
+            azure_tenant_id=settings.azure_tenant_id,
+            managed_identity_client_id=settings.managed_identity_client_id,
         )
-    finally:
-        await retriever.close()
-        await embedder.close()
-        await close_if_present(async_credential)
+        embedder = AzureOpenAIEmbedder(
+            endpoint=settings.azure_openai_endpoint,
+            deployment=settings.azure_openai_embedding_deployment,
+            api_version=settings.azure_openai_api_version,
+            credential=async_credential,
+        )
+        retriever = AzureSearchSectionRetriever(
+            endpoint=settings.azure_search_endpoint,
+            index_name=settings.azure_search_index_name,
+            credential=build_search_credential(settings, async_credential),
+            embed_query=embedder.embed_text,
+            top=settings.search_top,
+        )
 
-    write_jsonl(paths.dataset_path, rows)
-    print(f"Wrote {len(rows)} eval rows to {paths.dataset_path}")
+        try:
+            rows = await build_eval_rows(
+                questions=questions,
+                endpoint=endpoint,
+                env=env,
+                retriever=retriever,
+                timeout_seconds=args.timeout_seconds,
+                max_context_chars=args.max_context_chars,
+            )
+        finally:
+            await retriever.close()
+            await embedder.close()
+            await close_if_present(async_credential)
+
+        write_jsonl(paths.dataset_path, rows)
+        print(f"Wrote {len(rows)} eval rows to {paths.dataset_path}")
 
     if args.skip_evaluate:
         return
@@ -462,6 +472,11 @@ def run_foundry_dataset_evaluation(
             default="1",
         )
         run_name = read_optional_env(env, EVALUATION_RUN_NAME_ENV_VAR, default=EVALUATION_NAME)
+        delete_foundry_dataset_if_exists(
+            project_client.datasets,
+            name=dataset_name,
+            version=dataset_version,
+        )
         dataset = project_client.datasets.upload_file(
             name=dataset_name,
             version=dataset_version,
@@ -497,6 +512,13 @@ def run_foundry_dataset_evaluation(
         close_if_present_sync(openai_client)
         close_if_present_sync(project_client)
         close_if_present_sync(credential)
+
+
+def delete_foundry_dataset_if_exists(datasets: object, *, name: str, version: str) -> None:
+    try:
+        datasets.delete(name=name, version=version)
+    except ResourceNotFoundError:
+        return
 
 
 def run_foundry_trace_evaluation(
@@ -866,6 +888,25 @@ def write_jsonl(path: Path, rows: Sequence[Mapping[str, Any]]) -> None:
     with path.open("w", encoding="utf-8") as file:
         for row in rows:
             file.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as file:
+        for line_number, line in enumerate(file, start=1):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            try:
+                row = json.loads(stripped)
+            except json.JSONDecodeError as error:
+                raise ValueError(f"Invalid JSONL row at {path}:{line_number}") from error
+            if not isinstance(row, dict):
+                raise ValueError(f"JSONL row at {path}:{line_number} must be an object")
+            rows.append(row)
+    if not rows:
+        raise ValueError(f"JSONL dataset is empty: {path}")
+    return rows
 
 
 def read_required_str(payload: Mapping[str, Any], name: str) -> str:

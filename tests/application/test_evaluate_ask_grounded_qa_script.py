@@ -1,4 +1,5 @@
 import importlib.util
+import asyncio
 import os
 import sys
 from contextlib import contextmanager
@@ -294,6 +295,68 @@ def test_run_evaluation_keeps_foundry_upload_disabled_without_project_endpoint(
     assert "azure_ai_project" not in captured_kwargs
 
 
+def test_main_reuse_dataset_skips_dataset_generation(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    script = load_script()
+    dataset_path = tmp_path / "ask_grounded_qa_dataset.jsonl"
+    dataset_path.write_text(
+        '{"id":"q1","query":"질문1","context":"문맥1","ground_truth":"문맥1","response":"답변1"}\n'
+        '{"id":"q2","query":"질문2","context":"문맥2","ground_truth":"문맥2","response":"답변2"}\n',
+        encoding="utf-8",
+    )
+    settings = script.AzureRagSettings(
+        azure_openai_endpoint="https://openai.example",
+        azure_openai_api_version="2024-10-01-preview",
+        azure_openai_chat_deployment="gpt-4o-mini",
+        azure_openai_embedding_deployment="embedding",
+        azure_openai_vision_deployment="vision",
+        azure_search_endpoint="https://search.example",
+        azure_search_index_name="index",
+    )
+    captured_evaluation: dict[str, object] = {}
+    captured_telemetry: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "evaluate_ask_grounded_qa.py",
+            "--output-dir",
+            str(tmp_path),
+            "--reuse-dataset",
+            "--foundry-upload-mode",
+            "disabled",
+        ],
+    )
+    monkeypatch.setattr(script, "load_environment", lambda: {})
+    monkeypatch.setattr(script.AzureRagSettings, "from_env", lambda _: settings)
+    monkeypatch.setattr(script, "configure_process_observability", lambda **_: None)
+    monkeypatch.setattr(script, "build_logger", lambda _: object())
+    monkeypatch.setattr(script, "load_questions", lambda _: (_ for _ in ()).throw(AssertionError()))
+    monkeypatch.setattr(script, "build_azure_credential", lambda **_: (_ for _ in ()).throw(AssertionError()))
+    monkeypatch.setattr(script, "build_eval_rows", lambda **_: (_ for _ in ()).throw(AssertionError()))
+    monkeypatch.setattr(script, "write_jsonl", lambda *_: (_ for _ in ()).throw(AssertionError()))
+
+    def fake_run_evaluation(**kwargs: object) -> dict[str, object]:
+        captured_evaluation.update(kwargs)
+        return {"metrics": {"groundedness": 4.0}}
+
+    def fake_emit_evaluation_telemetry(**kwargs: object) -> None:
+        captured_telemetry.update(kwargs)
+
+    monkeypatch.setattr(script, "run_evaluation", fake_run_evaluation)
+    monkeypatch.setattr(script, "emit_evaluation_telemetry", fake_emit_evaluation_telemetry)
+    monkeypatch.setattr(script, "flush_observability", lambda: None)
+
+    asyncio.run(script.main())
+
+    assert captured_evaluation["dataset_path"] == dataset_path
+    assert captured_evaluation["results_path"] == tmp_path / "ask_grounded_qa_results.json"
+    assert captured_telemetry["row_count"] == 2
+
+
 def test_apply_azure_identity_environment_maps_managed_identity_client_id(
     monkeypatch,
 ) -> None:
@@ -423,9 +486,13 @@ def test_run_foundry_dataset_evaluation_uploads_jsonl_and_creates_cloud_run(
     created_eval_kwargs: dict[str, object] = {}
     created_run_kwargs: dict[str, object] = {}
     uploaded_files: list[dict[str, str]] = []
+    deleted_datasets: list[dict[str, str]] = []
     monkeypatch.setattr(script, "build_sync_azure_credential", lambda _: fake_credential)
 
     class FakeDatasets:
+        def delete(self, *, name: str, version: str) -> None:
+            deleted_datasets.append({"name": name, "version": version})
+
         def upload_file(self, *, name: str, version: str, file_path: str) -> object:
             uploaded_files.append({"name": name, "version": version, "file_path": file_path})
             return SimpleNamespace(id="dataset-1")
@@ -491,6 +558,7 @@ def test_run_foundry_dataset_evaluation_uploads_jsonl_and_creates_cloud_run(
         report_url="https://report.example",
         dataset_id="dataset-1",
     )
+    assert deleted_datasets == [{"name": "ask-dataset", "version": "2"}]
     assert uploaded_files == [
         {"name": "ask-dataset", "version": "2", "file_path": str(dataset_path)}
     ]

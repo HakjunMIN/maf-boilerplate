@@ -153,6 +153,7 @@ uv run python scripts/evaluate_ask_grounded_qa.py
 - --max-context-chars <int>
 - --evaluators <list>
 - --skip-evaluate
+- --reuse-dataset
 - --foundry-upload-mode cloud|classic|both|disabled
 - --foundry-trace-evaluate
 - --foundry-trace-only
@@ -168,6 +169,14 @@ uv run python scripts/evaluate_ask_grounded_qa.py
 ```bash
 uv run python scripts/evaluate_ask_grounded_qa.py --skip-evaluate
 ```
+
+이미 생성된 데이터셋으로 평가만 실행:
+
+```bash
+uv run python scripts/evaluate_ask_grounded_qa.py --reuse-dataset
+```
+
+`--reuse-dataset`은 `--output-dir` 아래의 `ask_grounded_qa_dataset.jsonl`을 그대로 사용합니다. 이때 Azure AI Search 조회와 `/ask` 호출, 데이터셋 재작성은 수행하지 않습니다.
 
 similarity 포함 실행:
 
@@ -227,6 +236,8 @@ az login --tenant <target-tenant-id>
 - 새 Foundry 포털의 Evaluation에 cloud dataset evaluation run 생성
 
 스크립트는 현재처럼 먼저 `/ask`를 직접 호출해 `query`, `context`, `response`, `ground_truth`가 들어 있는 JSONL을 만든 뒤, 그 JSONL을 Foundry dataset으로 업로드하고 evaluation run을 시작합니다.
+
+동일한 `AZURE_AI_EVALUATION_DATASET_NAME`과 `AZURE_AI_EVALUATION_DATASET_VERSION`이 이미 Foundry에 있으면, 기존 dataset version을 삭제한 뒤 현재 JSONL을 다시 업로드합니다.
 
 이전 classic 포털에도 남기려면:
 
