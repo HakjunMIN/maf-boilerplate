@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 import pytest
 from aiohttp.test_utils import TestClient, TestServer
 
@@ -150,3 +152,57 @@ async def test_build_app_from_env_loads_root_dotenv_when_running_from_src(
     ] == (
         "http://localhost:4317"
     )
+
+
+@pytest.mark.asyncio
+async def test_build_app_from_env_enables_trace_evaluation_from_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_attributes: list[dict[str, object]] = []
+
+    class FakeSpan:
+        def set_attribute(self, key: str, value: object) -> None:
+            captured_attributes.append({key: value})
+
+    @contextmanager
+    def fake_start_request_span(
+        name: str,
+        *,
+        tracer_name: str,
+        attributes: dict[str, object],
+    ):
+        captured_attributes.append(attributes)
+        yield FakeSpan()
+
+    env = {
+        "AZURE_OPENAI_ENDPOINT": "https://openai.example",
+        "AZURE_OPENAI_API_VERSION": "2025-07-01-preview",
+        "AZURE_OPENAI_CHAT_DEPLOYMENT": "chat-deployment",
+        "AZURE_OPENAI_EMBEDDING_DEPLOYMENT": "embedding-deployment",
+        "AZURE_OPENAI_VISION_DEPLOYMENT": "vision-deployment",
+        "AZURE_SEARCH_ENDPOINT": "https://search.example",
+        "AZURE_SEARCH_INDEX_NAME": "sections",
+        "HOMESTYLE_AGENT_BEARER_TOKEN": "expected-token",
+        "ENABLE_FOUNDRY_TRACE_EVALUATION": "true",
+        "AZURE_AI_EVALUATION_TRACE_AGENT_ID": "homestyle-agent:prod",
+    }
+    monkeypatch.setattr(
+        "homestyle_agent.api.server.AzureRagRuntime",
+        FakeConfiguredRuntime,
+    )
+    monkeypatch.setattr("homestyle_agent.api.http.start_request_span", fake_start_request_span)
+
+    app = build_app_from_env(env)
+    client = TestClient(TestServer(app))
+    await client.start_server()
+    try:
+        response = await client.post(
+            "/ask",
+            json={"question": "거실 스타일링"},
+            headers={"Authorization": "Bearer expected-token"},
+        )
+    finally:
+        await client.close()
+
+    assert response.status == 200
+    assert captured_attributes[0]["gen_ai.agent.id"] == "homestyle-agent:prod"

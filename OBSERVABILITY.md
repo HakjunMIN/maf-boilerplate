@@ -192,14 +192,14 @@ grounded QA 평가 결과도 같은 OTLP 설정을 사용합니다. 평가 스�
 uv run python scripts/evaluate_ask_grounded_qa.py
 ```
 
-Azure AI Foundry project에도 evaluation run을 남기려면 project endpoint를 추가합니다.
+Azure AI Foundry project에도 새 포털용 cloud evaluation run을 남기려면 project endpoint를 추가합니다.
 
 ```dotenv
 AZURE_AI_PROJECT_ENDPOINT=https://<foundry-project-endpoint>
 ```
 
 `AZURE_AI_PROJECT_URL` 또는 `AZURE_AI_FOUNDRY_PROJECT_ENDPOINT`도 같은 용도로 사용할 수 있습니다.
-업로드 시 Azure AI Evaluation SDK에는 `.env`의 `AZURE_TENANT_ID`를 반영한 credential을 명시적으로 전달합니다. 그래도 tenant mismatch가 나면 Azure CLI 계정이 해당 tenant에 로그인되어 있는지 확인하고 `az login --tenant <tenant-id>`로 다시 로그인합니다.
+평가 스크립트는 기본적으로 `/ask` 응답을 미리 생성한 JSONL을 Foundry dataset으로 올리고 `azure-ai-projects` cloud evaluation run을 시작합니다. 이전 classic 포털 호환 업로드가 필요하면 `--foundry-upload-mode classic` 또는 `both`를 사용합니다. 그래도 tenant mismatch가 나면 Azure CLI 계정이 해당 tenant에 로그인되어 있는지 확인하고 `az login --tenant <tenant-id>`로 다시 로그인합니다.
 
 적합한 경우:
 
@@ -207,6 +207,26 @@ AZURE_AI_PROJECT_ENDPOINT=https://<foundry-project-endpoint>
 - 에이전트 실행의 trace, log, metric을 직접 확인하고 싶을 때
 - grounded QA eval metric을 Aspire Dashboard에서 확인하고 싶을 때
 - Azure Monitor 없이 tool span, model call을 검증하고 싶을 때
+
+### Foundry trace evaluation
+
+운영 트래픽은 요청을 재실행하지 않고 Application Insights에 저장된 trace를 Foundry cloud evaluation으로 평가할 수 있습니다.
+
+```dotenv
+AZURE_AI_PROJECT_ENDPOINT=https://<foundry-project-endpoint>
+APPLICATION_INSIGHTS_CONNECTION_STRING=InstrumentationKey=...;IngestionEndpoint=...
+ENABLE_FOUNDRY_TRACE_EVALUATION=true
+AZURE_AI_EVALUATION_TRACE_AGENT_ID=homestyle-agent:1
+AZURE_EXPERIMENTAL_ENABLE_GENAI_TRACING=true
+AZURE_AI_EVALUATION_TRACE_LOOKBACK_HOURS=1
+AZURE_AI_EVALUATION_TRACE_MAX_TRACES=50
+```
+
+```bash
+uv run python scripts/evaluate_ask_grounded_qa.py --foundry-trace-only
+```
+
+Foundry trace evaluation은 Application Insights에 `gen_ai.operation.name=invoke_agent`, `gen_ai.agent.id`, `gen_ai.input.messages`, `gen_ai.output.messages`가 있는 trace를 대상으로 합니다. 현재 저장소의 일반 summary eval telemetry와는 별개입니다. `/ask` 경로는 `ENABLE_FOUNDRY_TRACE_EVALUATION=true`일 때만 query/response 원문을 GenAI semantic convention 속성으로 내보냅니다. Azure Monitor exporter가 이 GenAI 속성을 전송하도록 `AZURE_EXPERIMENTAL_ENABLE_GENAI_TRACING=true`도 함께 설정합니다.
 
 ### Console exporter만 사용
 

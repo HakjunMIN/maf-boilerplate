@@ -16,6 +16,7 @@ def isolate_observability_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "ENABLE_CONSOLE_EXPORTERS",
         "ENABLE_INSTRUMENTATION",
         "ENABLE_SENSITIVE_DATA",
+        "AZURE_EXPERIMENTAL_ENABLE_GENAI_TRACING",
         "OTEL_EXPORTER_OTLP_ENDPOINT",
         "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
         "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
@@ -45,6 +46,19 @@ def test_configure_process_observability_emits_json_logs(
     assert '"value": 1' in output
     assert '"correlation_id": "corr-123"' in output
     assert '"logger": "test_logger"' in output
+
+
+def test_configure_process_observability_quiets_azure_sdk_http_logs() -> None:
+    azure_logger = logging.getLogger("azure")
+    original_level = azure_logger.level
+    try:
+        azure_logger.setLevel(logging.NOTSET)
+
+        configure_process_observability(log_level="INFO")
+
+        assert azure_logger.level == logging.WARNING
+    finally:
+        azure_logger.setLevel(original_level)
 
 
 def test_configure_process_observability_initializes_azure_monitor(
@@ -188,6 +202,31 @@ def test_configure_process_observability_applies_otlp_values_from_dotenv_mapping
     assert calls == ["configure_otel_providers", "attach_application_logging"]
     assert os.environ["ENABLE_INSTRUMENTATION"] == "true"
     assert os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] == "http://localhost:4317"
+
+
+def test_configure_process_observability_applies_azure_monitor_genai_trace_opt_in(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("AZURE_EXPERIMENTAL_ENABLE_GENAI_TRACING", raising=False)
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._AZURE_MONITOR_CONNECTION_STRING",
+        None,
+    )
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._configure_azure_monitor",
+        lambda _: None,
+    )
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._enable_agent_framework_instrumentation",
+        lambda _: None,
+    )
+
+    configure_process_observability(
+        application_insights_connection_string="InstrumentationKey=test",
+        env={"AZURE_EXPERIMENTAL_ENABLE_GENAI_TRACING": "true"},
+    )
+
+    assert os.environ["AZURE_EXPERIMENTAL_ENABLE_GENAI_TRACING"] == "true"
 
 
 def test_attach_application_otel_logging_handler_adds_one_root_handler(

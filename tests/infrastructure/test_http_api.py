@@ -1,3 +1,5 @@
+from contextlib import contextmanager
+
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
@@ -64,6 +66,64 @@ async def test_http_api_answers_and_creates_session() -> None:
     assert runtime.calls == [
         {"correlation_id": body["session_id"], "session_id": body["session_id"]}
     ]
+
+
+@pytest.mark.asyncio
+async def test_http_api_emits_gen_ai_trace_span_when_enabled(monkeypatch) -> None:
+    captured_spans: list[dict[str, object]] = []
+
+    class FakeSpan:
+        def __init__(self) -> None:
+            self.attributes: dict[str, object] = {}
+
+        def set_attribute(self, key: str, value: object) -> None:
+            self.attributes[key] = value
+
+    @contextmanager
+    def fake_start_request_span(
+        name: str,
+        *,
+        tracer_name: str,
+        attributes: dict[str, object],
+    ):
+        span = FakeSpan()
+        captured_spans.append(
+            {
+                "name": name,
+                "tracer_name": tracer_name,
+                "attributes": attributes,
+                "span": span,
+            }
+        )
+        yield span
+
+    monkeypatch.setattr("homestyle_agent.api.http.start_request_span", fake_start_request_span)
+    runtime = FakeRuntime()
+    app = create_app(
+        runtime=runtime,
+        session_store=InMemorySessionStore(),
+        authenticate_request=allow_request,
+        enable_trace_evaluation=True,
+        trace_agent_id="homestyle-agent:1",
+    )
+    client = TestClient(TestServer(app))
+    await client.start_server()
+    try:
+        response = await client.post("/ask", json={"question": "거실 스타일링"})
+        body = await response.json()
+    finally:
+        await client.close()
+
+    assert response.status == 200
+    assert captured_spans[0]["name"] == "invoke_agent"
+    attributes = captured_spans[0]["attributes"]
+    assert attributes["gen_ai.operation.name"] == "invoke_agent"
+    assert attributes["gen_ai.agent.id"] == "homestyle-agent:1"
+    assert attributes["gen_ai.agent.name"] == "homestyle-agent"
+    assert attributes["gen_ai.conversation.id"] == body["session_id"]
+    assert "거실 스타일링" in str(attributes["gen_ai.input.messages"])
+    span = captured_spans[0]["span"]
+    assert "answer for 거실 스타일링" in span.attributes["gen_ai.output.messages"]
 
 
 @pytest.mark.asyncio

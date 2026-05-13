@@ -9,6 +9,8 @@ from homestyle_agent.infrastructure.runtime import AzureRagRuntime
 from homestyle_shared.infrastructure.settings import AzureRagSettings, load_environment
 
 _AUTH_TOKEN_ENV = "HOMESTYLE_AGENT_BEARER_TOKEN"
+_ENABLE_TRACE_EVALUATION_ENV = "ENABLE_FOUNDRY_TRACE_EVALUATION"
+_TRACE_AGENT_ID_ENV = "AZURE_AI_EVALUATION_TRACE_AGENT_ID"
 
 
 def build_app_from_env(env: Mapping[str, str] | None = None) -> web.Application:
@@ -19,6 +21,9 @@ def build_app_from_env(env: Mapping[str, str] | None = None) -> web.Application:
         runtime=AzureRagRuntime(settings, observability_environment=values),
         session_store=InMemorySessionStore(),
         authenticate_request=bearer_token_auth(token),
+        enable_trace_evaluation=_is_enabled(values.get(_ENABLE_TRACE_EVALUATION_ENV, "")),
+        trace_agent_id=values.get(_TRACE_AGENT_ID_ENV, "homestyle-agent:1").strip()
+        or "homestyle-agent:1",
     )
 
 
@@ -45,6 +50,10 @@ def _read_required_token(env: Mapping[str, str]) -> str:
     if not token:
         raise ValueError(f"Missing required API authentication setting: {_AUTH_TOKEN_ENV}")
     return token
+
+
+def _is_enabled(value: str) -> bool:
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _unauthorized_response() -> web.HTTPUnauthorized:

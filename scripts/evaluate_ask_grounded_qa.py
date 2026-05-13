@@ -38,9 +38,17 @@ DEFAULT_QUESTIONS_PATH = Path("tests/e2e/observability_questions.json")
 DEFAULT_OUTPUT_DIR = Path(".eval/grounded-qa")
 DEFAULT_EVALUATORS = ("groundedness", "relevance", "coherence", "fluency")
 EVALUATOR_CHOICES = (*DEFAULT_EVALUATORS, "similarity")
+FOUNDRY_UPLOAD_MODES = ("cloud", "classic", "both", "disabled")
+TRACE_EVALUATORS = ("relevance", "coherence", "fluency", "intent_resolution")
 EVALUATION_API_KEY_ENV_VARS = ("AZURE_AI_EVALUATION_OPENAI_API_KEY", "AZURE_OPENAI_API_KEY")
 EVALUATION_DEPLOYMENT_ENV_VAR = "AZURE_AI_EVALUATION_OPENAI_DEPLOYMENT"
 EVALUATION_REASONING_MODEL_ENV_VAR = "AZURE_AI_EVALUATION_REASONING_MODEL"
+EVALUATION_DATASET_NAME_ENV_VAR = "AZURE_AI_EVALUATION_DATASET_NAME"
+EVALUATION_DATASET_VERSION_ENV_VAR = "AZURE_AI_EVALUATION_DATASET_VERSION"
+EVALUATION_RUN_NAME_ENV_VAR = "AZURE_AI_EVALUATION_RUN_NAME"
+FOUNDRY_TRACE_AGENT_ID_ENV_VAR = "AZURE_AI_EVALUATION_TRACE_AGENT_ID"
+FOUNDRY_TRACE_LOOKBACK_HOURS_ENV_VAR = "AZURE_AI_EVALUATION_TRACE_LOOKBACK_HOURS"
+FOUNDRY_TRACE_MAX_TRACES_ENV_VAR = "AZURE_AI_EVALUATION_TRACE_MAX_TRACES"
 AZURE_AI_PROJECT_ENDPOINT_ENV_VARS = (
     "AZURE_AI_PROJECT_ENDPOINT",
     "AZURE_AI_PROJECT_URL",
@@ -73,6 +81,15 @@ class EvalPaths:
     results_path: Path
 
 
+@dataclass(frozen=True)
+class FoundryRunSummary:
+    eval_id: str | None
+    run_id: str | None
+    status: str | None
+    report_url: str | None
+    dataset_id: str | None = None
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Build a grounded QA eval dataset and evaluate /ask responses.",
@@ -93,6 +110,35 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Only write the JSONL dataset; do not run Azure AI Evaluation.",
     )
+    parser.add_argument(
+        "--foundry-upload-mode",
+        choices=FOUNDRY_UPLOAD_MODES,
+        default="cloud",
+        help=(
+            "How to upload when AZURE_AI_PROJECT_ENDPOINT is configured. "
+            "cloud creates a new Foundry portal cloud evaluation run. "
+            "classic uses azure.ai.evaluation tracking."
+        ),
+    )
+    parser.add_argument(
+        "--foundry-trace-evaluate",
+        action="store_true",
+        help="Also start a Foundry cloud trace evaluation run for recent production traces.",
+    )
+    parser.add_argument(
+        "--foundry-trace-only",
+        action="store_true",
+        help="Only start a Foundry cloud trace evaluation run; do not build /ask dataset rows.",
+    )
+    parser.add_argument("--trace-agent-id", default=None)
+    parser.add_argument("--trace-lookback-hours", type=int, default=None)
+    parser.add_argument("--trace-max-traces", type=int, default=None)
+    parser.add_argument(
+        "--trace-evaluators",
+        nargs="+",
+        choices=TRACE_EVALUATORS,
+        default=["relevance", "coherence", "fluency"],
+    )
     return parser.parse_args()
 
 
@@ -106,6 +152,19 @@ async def main() -> None:
         env=env,
     )
     logger = build_logger("grounded_qa_evaluation")
+
+    if args.foundry_trace_only:
+        trace_run = run_foundry_trace_evaluation(
+            settings=settings,
+            env=env,
+            evaluator_names=args.trace_evaluators,
+            agent_id=args.trace_agent_id,
+            lookback_hours=args.trace_lookback_hours,
+            max_traces=args.trace_max_traces,
+        )
+        print_foundry_run_summary("Started Foundry trace evaluation", trace_run)
+        return
+
     questions, configured_endpoint = load_questions(args.questions)
     endpoint = args.ask_endpoint or configured_endpoint or "http://127.0.0.1:8080/ask"
     paths = make_eval_paths(args.output_dir)
@@ -155,6 +214,7 @@ async def main() -> None:
         settings=settings,
         env=env,
         evaluator_names=args.evaluators,
+        foundry_upload_mode=args.foundry_upload_mode,
     )
     emit_evaluation_telemetry(
         result=result,
@@ -167,6 +227,26 @@ async def main() -> None:
     flush_observability()
     print(f"Wrote evaluation results to {paths.results_path}")
     print(json.dumps(result.get("metrics", {}), ensure_ascii=False, indent=2))
+
+    if args.foundry_upload_mode in {"cloud", "both"} and read_azure_ai_project(env) is not None:
+        cloud_run = run_foundry_dataset_evaluation(
+            dataset_path=paths.dataset_path,
+            settings=settings,
+            env=env,
+            evaluator_names=args.evaluators,
+        )
+        print_foundry_run_summary("Started Foundry dataset evaluation", cloud_run)
+
+    if args.foundry_trace_evaluate:
+        trace_run = run_foundry_trace_evaluation(
+            settings=settings,
+            env=env,
+            evaluator_names=args.trace_evaluators,
+            agent_id=args.trace_agent_id,
+            lookback_hours=args.trace_lookback_hours,
+            max_traces=args.trace_max_traces,
+        )
+        print_foundry_run_summary("Started Foundry trace evaluation", trace_run)
 
 
 def load_questions(path: Path) -> tuple[list[EvalQuestion], str | None]:
@@ -272,6 +352,7 @@ def run_evaluation(
     settings: AzureRagSettings,
     env: Mapping[str, str],
     evaluator_names: Sequence[str],
+    foundry_upload_mode: str = "cloud",
 ) -> dict[str, Any]:
     try:
         from azure.ai.evaluation import (
@@ -332,7 +413,7 @@ def run_evaluation(
         "output_path": str(results_path),
     }
     azure_ai_project = read_azure_ai_project(env)
-    if azure_ai_project is not None:
+    if azure_ai_project is not None and foundry_upload_mode in {"classic", "both"}:
         apply_azure_identity_environment(env)
         evaluate_kwargs["azure_ai_project"] = azure_ai_project
         foundry_upload_credential = sync_credential or build_sync_azure_credential(settings)
@@ -345,6 +426,259 @@ def run_evaluation(
         close_if_present_sync(sync_credential)
         if foundry_upload_credential is not sync_credential:
             close_if_present_sync(foundry_upload_credential)
+
+
+def run_foundry_dataset_evaluation(
+    *,
+    dataset_path: Path,
+    settings: AzureRagSettings,
+    env: Mapping[str, str],
+    evaluator_names: Sequence[str],
+) -> FoundryRunSummary:
+    azure_ai_project = read_azure_ai_project(env)
+    if azure_ai_project is None:
+        raise RuntimeError("Set AZURE_AI_PROJECT_ENDPOINT before running Foundry cloud evaluation.")
+
+    try:
+        from azure.ai.projects import AIProjectClient
+    except ImportError as error:
+        raise RuntimeError("Install azure-ai-projects before running Foundry cloud evaluation.") from error
+
+    apply_azure_identity_environment(env)
+    credential = build_sync_azure_credential(settings)
+    project_client = None
+    openai_client = None
+    try:
+        project_client = AIProjectClient(endpoint=azure_ai_project, credential=credential)
+        openai_client = project_client.get_openai_client()
+        dataset_name = read_optional_env(
+            env,
+            EVALUATION_DATASET_NAME_ENV_VAR,
+            default=EVALUATION_NAME,
+        )
+        dataset_version = read_optional_env(
+            env,
+            EVALUATION_DATASET_VERSION_ENV_VAR,
+            default="1",
+        )
+        run_name = read_optional_env(env, EVALUATION_RUN_NAME_ENV_VAR, default=EVALUATION_NAME)
+        dataset = project_client.datasets.upload_file(
+            name=dataset_name,
+            version=dataset_version,
+            file_path=str(dataset_path),
+        )
+        data_source_config = build_foundry_dataset_data_source_config()
+        testing_criteria = build_foundry_dataset_testing_criteria(
+            evaluator_names=evaluator_names,
+            deployment=read_evaluation_deployment(env, settings),
+        )
+        eval_object = openai_client.evals.create(
+            name=EVALUATION_NAME,
+            data_source_config=data_source_config,
+            testing_criteria=testing_criteria,
+        )
+        eval_run = openai_client.evals.runs.create(
+            eval_id=read_object_value(eval_object, "id"),
+            name=run_name,
+            data_source={
+                "type": "jsonl",
+                "source": {
+                    "type": "file_id",
+                    "id": read_object_value(dataset, "id"),
+                },
+            },
+        )
+        return summarize_foundry_run(
+            eval_object=eval_object,
+            eval_run=eval_run,
+            dataset_id=read_object_value(dataset, "id"),
+        )
+    finally:
+        close_if_present_sync(openai_client)
+        close_if_present_sync(project_client)
+        close_if_present_sync(credential)
+
+
+def run_foundry_trace_evaluation(
+    *,
+    settings: AzureRagSettings,
+    env: Mapping[str, str],
+    evaluator_names: Sequence[str],
+    agent_id: str | None,
+    lookback_hours: int | None,
+    max_traces: int | None,
+) -> FoundryRunSummary:
+    azure_ai_project = read_azure_ai_project(env)
+    if azure_ai_project is None:
+        raise RuntimeError("Set AZURE_AI_PROJECT_ENDPOINT before running Foundry trace evaluation.")
+
+    resolved_agent_id = (
+        agent_id
+        or env.get(FOUNDRY_TRACE_AGENT_ID_ENV_VAR, "").strip()
+        or env.get("AGENT_ID", "").strip()
+    )
+    if not resolved_agent_id:
+        raise RuntimeError("Set AZURE_AI_EVALUATION_TRACE_AGENT_ID or pass --trace-agent-id.")
+
+    try:
+        from azure.ai.projects import AIProjectClient
+    except ImportError as error:
+        raise RuntimeError("Install azure-ai-projects before running Foundry trace evaluation.") from error
+
+    apply_azure_identity_environment(env)
+    credential = build_sync_azure_credential(settings)
+    project_client = None
+    openai_client = None
+    try:
+        project_client = AIProjectClient(endpoint=azure_ai_project, credential=credential)
+        openai_client = project_client.get_openai_client()
+        eval_object = openai_client.evals.create(
+            name=f"{EVALUATION_NAME}_trace",
+            data_source_config={"type": "azure_ai_source", "scenario": "traces"},
+            testing_criteria=build_foundry_trace_testing_criteria(
+                evaluator_names=evaluator_names,
+                deployment=read_evaluation_deployment(env, settings),
+            ),
+        )
+        eval_run = openai_client.evals.runs.create(
+            eval_id=read_object_value(eval_object, "id"),
+            name=f"{EVALUATION_NAME}_trace_run",
+            data_source={
+                "type": "azure_ai_traces",
+                "agent_id": resolved_agent_id,
+                "max_traces": read_int_env(
+                    env,
+                    FOUNDRY_TRACE_MAX_TRACES_ENV_VAR,
+                    default=max_traces or 50,
+                ),
+                "lookback_hours": read_int_env(
+                    env,
+                    FOUNDRY_TRACE_LOOKBACK_HOURS_ENV_VAR,
+                    default=lookback_hours or 1,
+                ),
+            },
+        )
+        return summarize_foundry_run(eval_object=eval_object, eval_run=eval_run, dataset_id=None)
+    finally:
+        close_if_present_sync(openai_client)
+        close_if_present_sync(project_client)
+        close_if_present_sync(credential)
+
+
+def build_foundry_dataset_data_source_config() -> dict[str, object]:
+    return {
+        "type": "custom",
+        "item_schema": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string"},
+                "query": {"type": "string"},
+                "context": {"type": "string"},
+                "ground_truth": {"type": "string"},
+                "response": {"type": "string"},
+            },
+            "required": ["query", "context", "response"],
+        },
+    }
+
+
+def build_foundry_dataset_testing_criteria(
+    *,
+    evaluator_names: Sequence[str],
+    deployment: str,
+) -> list[dict[str, object]]:
+    mappings: dict[str, dict[str, str]] = {
+        "groundedness": {
+            "query": "{{item.query}}",
+            "response": "{{item.response}}",
+            "context": "{{item.context}}",
+        },
+        "relevance": {
+            "query": "{{item.query}}",
+            "response": "{{item.response}}",
+        },
+        "coherence": {
+            "query": "{{item.query}}",
+            "response": "{{item.response}}",
+        },
+        "fluency": {
+            "response": "{{item.response}}",
+        },
+        "similarity": {
+            "response": "{{item.response}}",
+            "ground_truth": "{{item.ground_truth}}",
+        },
+    }
+    return [
+        build_foundry_testing_criterion(name, mappings[name], deployment)
+        for name in evaluator_names
+    ]
+
+
+def build_foundry_trace_testing_criteria(
+    *,
+    evaluator_names: Sequence[str],
+    deployment: str,
+) -> list[dict[str, object]]:
+    mappings: dict[str, dict[str, str]] = {
+        "relevance": {
+            "query": "{{item.query}}",
+            "response": "{{item.response}}",
+        },
+        "coherence": {
+            "query": "{{item.query}}",
+            "response": "{{item.response}}",
+        },
+        "fluency": {
+            "response": "{{item.response}}",
+        },
+        "intent_resolution": {
+            "query": "{{item.query}}",
+            "response": "{{item.response}}",
+            "tool_definitions": "{{item.tool_definitions}}",
+        },
+    }
+    return [
+        build_foundry_testing_criterion(name, mappings[name], deployment)
+        for name in evaluator_names
+    ]
+
+
+def build_foundry_testing_criterion(
+    name: str,
+    data_mapping: Mapping[str, str],
+    deployment: str,
+) -> dict[str, object]:
+    return {
+        "type": "azure_ai_evaluator",
+        "name": name,
+        "evaluator_name": f"builtin.{name}",
+        "initialization_parameters": {"deployment_name": deployment},
+        "data_mapping": dict(data_mapping),
+    }
+
+
+def summarize_foundry_run(
+    *,
+    eval_object: object,
+    eval_run: object,
+    dataset_id: str | None,
+) -> FoundryRunSummary:
+    return FoundryRunSummary(
+        eval_id=read_object_value(eval_object, "id"),
+        run_id=read_object_value(eval_run, "id"),
+        status=read_object_value(eval_run, "status"),
+        report_url=read_object_value(eval_run, "report_url"),
+        dataset_id=dataset_id,
+    )
+
+
+def print_foundry_run_summary(prefix: str, summary: FoundryRunSummary) -> None:
+    print(f"{prefix}: eval_id={summary.eval_id}, run_id={summary.run_id}, status={summary.status}")
+    if summary.dataset_id:
+        print(f"Foundry dataset id: {summary.dataset_id}")
+    if summary.report_url:
+        print(f"Foundry report URL: {summary.report_url}")
 
 
 def emit_evaluation_telemetry(
@@ -451,6 +785,34 @@ def read_azure_ai_project(env: Mapping[str, str]) -> str | None:
         if value:
             return value
     return None
+
+
+def read_optional_env(env: Mapping[str, str], name: str, *, default: str) -> str:
+    value = env.get(name, "").strip()
+    return value or default
+
+
+def read_int_env(env: Mapping[str, str], name: str, *, default: int) -> int:
+    value = env.get(name, "").strip()
+    if not value:
+        return default
+    try:
+        parsed = int(value)
+    except ValueError as error:
+        raise ValueError(f"{name} must be an integer") from error
+    if parsed < 1:
+        raise ValueError(f"{name} must be greater than zero")
+    return parsed
+
+
+def read_object_value(source: object, name: str) -> str | None:
+    if isinstance(source, Mapping):
+        value = source.get(name)
+    else:
+        value = getattr(source, name, None)
+    if value is None:
+        return None
+    return str(value)
 
 
 def apply_azure_identity_environment(env: Mapping[str, str]) -> None:

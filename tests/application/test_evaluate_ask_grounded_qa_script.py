@@ -172,6 +172,7 @@ def test_run_evaluation_uploads_to_foundry_when_project_endpoint_is_configured(
             "AZURE_TENANT_ID": "tenant-id",
         },
         evaluator_names=["groundedness"],
+        foundry_upload_mode="classic",
     )
 
     assert result == {"metrics": {"groundedness": 4.0}}
@@ -180,6 +181,63 @@ def test_run_evaluation_uploads_to_foundry_when_project_endpoint_is_configured(
     assert captured_kwargs["credential"] is fake_upload_credential
     assert captured_kwargs["output_path"] == str(tmp_path / "results.json")
     assert os.environ["AZURE_TENANT_ID"] == "tenant-id"
+
+
+def test_run_evaluation_does_not_use_classic_foundry_upload_by_default(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    script = load_script()
+    captured_kwargs: dict[str, object] = {}
+
+    class FakeModelConfiguration:
+        def __init__(self, **kwargs: object) -> None:
+            self.kwargs = kwargs
+
+    class FakeEvaluator:
+        def __init__(self, model_config: object, **kwargs: object) -> None:
+            self.model_config = model_config
+            self.kwargs = kwargs
+
+    def fake_evaluate(**kwargs: object) -> dict[str, object]:
+        captured_kwargs.update(kwargs)
+        return {"metrics": {}}
+
+    monkeypatch.setitem(
+        sys.modules,
+        "azure.ai.evaluation",
+        SimpleNamespace(
+            AzureOpenAIModelConfiguration=FakeModelConfiguration,
+            CoherenceEvaluator=FakeEvaluator,
+            FluencyEvaluator=FakeEvaluator,
+            GroundednessEvaluator=FakeEvaluator,
+            RelevanceEvaluator=FakeEvaluator,
+            SimilarityEvaluator=FakeEvaluator,
+            evaluate=fake_evaluate,
+        ),
+    )
+    settings = script.AzureRagSettings(
+        azure_openai_endpoint="https://openai.example",
+        azure_openai_api_version="2024-10-01-preview",
+        azure_openai_chat_deployment="gpt-4o-mini",
+        azure_openai_embedding_deployment="embedding",
+        azure_openai_vision_deployment="vision",
+        azure_search_endpoint="https://search.example",
+        azure_search_index_name="index",
+    )
+
+    script.run_evaluation(
+        dataset_path=tmp_path / "dataset.jsonl",
+        results_path=tmp_path / "results.json",
+        settings=settings,
+        env={
+            "AZURE_AI_EVALUATION_OPENAI_API_KEY": "eval-key",
+            "AZURE_AI_PROJECT_ENDPOINT": "https://foundry.example/projects/project-1",
+        },
+        evaluator_names=["groundedness"],
+    )
+
+    assert "azure_ai_project" not in captured_kwargs
 
 
 def test_run_evaluation_keeps_foundry_upload_disabled_without_project_endpoint(
@@ -352,3 +410,183 @@ def test_emit_evaluation_telemetry_sends_summary_without_row_payload(
     assert captured_logs[0][0] == "grounded_qa_evaluation_completed"
     assert "민감한 질문" not in str(captured_logs)
     assert "민감한 답변" not in str(captured_logs)
+
+
+def test_run_foundry_dataset_evaluation_uploads_jsonl_and_creates_cloud_run(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    script = load_script()
+    dataset_path = tmp_path / "dataset.jsonl"
+    dataset_path.write_text('{"query":"q","context":"c","response":"r"}\n', encoding="utf-8")
+    fake_credential = object()
+    created_eval_kwargs: dict[str, object] = {}
+    created_run_kwargs: dict[str, object] = {}
+    uploaded_files: list[dict[str, str]] = []
+    monkeypatch.setattr(script, "build_sync_azure_credential", lambda _: fake_credential)
+
+    class FakeDatasets:
+        def upload_file(self, *, name: str, version: str, file_path: str) -> object:
+            uploaded_files.append({"name": name, "version": version, "file_path": file_path})
+            return SimpleNamespace(id="dataset-1")
+
+    class FakeRuns:
+        def create(self, **kwargs: object) -> object:
+            created_run_kwargs.update(kwargs)
+            return SimpleNamespace(id="run-1", status="queued", report_url="https://report.example")
+
+    class FakeEvals:
+        def __init__(self) -> None:
+            self.runs = FakeRuns()
+
+        def create(self, **kwargs: object) -> object:
+            created_eval_kwargs.update(kwargs)
+            return SimpleNamespace(id="eval-1")
+
+    class FakeOpenAIClient:
+        def __init__(self) -> None:
+            self.evals = FakeEvals()
+
+    class FakeAIProjectClient:
+        def __init__(self, *, endpoint: str, credential: object) -> None:
+            self.endpoint = endpoint
+            self.credential = credential
+            self.datasets = FakeDatasets()
+
+        def get_openai_client(self) -> FakeOpenAIClient:
+            return FakeOpenAIClient()
+
+    monkeypatch.setitem(
+        sys.modules,
+        "azure.ai.projects",
+        SimpleNamespace(AIProjectClient=FakeAIProjectClient),
+    )
+    settings = script.AzureRagSettings(
+        azure_openai_endpoint="https://openai.example",
+        azure_openai_api_version="2024-10-01-preview",
+        azure_openai_chat_deployment="gpt-4o-mini",
+        azure_openai_embedding_deployment="embedding",
+        azure_openai_vision_deployment="vision",
+        azure_search_endpoint="https://search.example",
+        azure_search_index_name="index",
+    )
+
+    summary = script.run_foundry_dataset_evaluation(
+        dataset_path=dataset_path,
+        settings=settings,
+        env={
+            "AZURE_AI_PROJECT_ENDPOINT": "https://foundry.example/projects/project-1",
+            "AZURE_AI_EVALUATION_OPENAI_DEPLOYMENT": "gpt-4.1",
+            "AZURE_AI_EVALUATION_DATASET_NAME": "ask-dataset",
+            "AZURE_AI_EVALUATION_DATASET_VERSION": "2",
+            "AZURE_AI_EVALUATION_RUN_NAME": "ask-run",
+        },
+        evaluator_names=["groundedness", "similarity"],
+    )
+
+    assert summary == script.FoundryRunSummary(
+        eval_id="eval-1",
+        run_id="run-1",
+        status="queued",
+        report_url="https://report.example",
+        dataset_id="dataset-1",
+    )
+    assert uploaded_files == [
+        {"name": "ask-dataset", "version": "2", "file_path": str(dataset_path)}
+    ]
+    assert created_eval_kwargs["name"] == "ask_grounded_qa"
+    criteria = created_eval_kwargs["testing_criteria"]
+    assert criteria[0]["evaluator_name"] == "builtin.groundedness"
+    assert criteria[0]["data_mapping"]["context"] == "{{item.context}}"
+    assert criteria[1]["evaluator_name"] == "builtin.similarity"
+    assert criteria[1]["data_mapping"]["ground_truth"] == "{{item.ground_truth}}"
+    assert created_run_kwargs == {
+        "eval_id": "eval-1",
+        "name": "ask-run",
+        "data_source": {
+            "type": "jsonl",
+            "source": {"type": "file_id", "id": "dataset-1"},
+        },
+    }
+
+
+def test_run_foundry_trace_evaluation_creates_agent_filter_run(monkeypatch) -> None:
+    script = load_script()
+    fake_credential = object()
+    created_eval_kwargs: dict[str, object] = {}
+    created_run_kwargs: dict[str, object] = {}
+    monkeypatch.setattr(script, "build_sync_azure_credential", lambda _: fake_credential)
+
+    class FakeRuns:
+        def create(self, **kwargs: object) -> object:
+            created_run_kwargs.update(kwargs)
+            return SimpleNamespace(id="run-1", status="queued", report_url=None)
+
+    class FakeEvals:
+        def __init__(self) -> None:
+            self.runs = FakeRuns()
+
+        def create(self, **kwargs: object) -> object:
+            created_eval_kwargs.update(kwargs)
+            return SimpleNamespace(id="eval-1")
+
+    class FakeOpenAIClient:
+        def __init__(self) -> None:
+            self.evals = FakeEvals()
+
+    class FakeAIProjectClient:
+        def __init__(self, *, endpoint: str, credential: object) -> None:
+            self.endpoint = endpoint
+            self.credential = credential
+
+        def get_openai_client(self) -> FakeOpenAIClient:
+            return FakeOpenAIClient()
+
+    monkeypatch.setitem(
+        sys.modules,
+        "azure.ai.projects",
+        SimpleNamespace(AIProjectClient=FakeAIProjectClient),
+    )
+    settings = script.AzureRagSettings(
+        azure_openai_endpoint="https://openai.example",
+        azure_openai_api_version="2024-10-01-preview",
+        azure_openai_chat_deployment="gpt-4o-mini",
+        azure_openai_embedding_deployment="embedding",
+        azure_openai_vision_deployment="vision",
+        azure_search_endpoint="https://search.example",
+        azure_search_index_name="index",
+    )
+
+    summary = script.run_foundry_trace_evaluation(
+        settings=settings,
+        env={
+            "AZURE_AI_PROJECT_ENDPOINT": "https://foundry.example/projects/project-1",
+            "AZURE_AI_EVALUATION_OPENAI_DEPLOYMENT": "gpt-4.1",
+            "AZURE_AI_EVALUATION_TRACE_AGENT_ID": "homestyle-agent:1",
+            "AZURE_AI_EVALUATION_TRACE_LOOKBACK_HOURS": "6",
+            "AZURE_AI_EVALUATION_TRACE_MAX_TRACES": "25",
+        },
+        evaluator_names=["relevance", "intent_resolution"],
+        agent_id=None,
+        lookback_hours=None,
+        max_traces=None,
+    )
+
+    assert summary.eval_id == "eval-1"
+    assert created_eval_kwargs["data_source_config"] == {
+        "type": "azure_ai_source",
+        "scenario": "traces",
+    }
+    criteria = created_eval_kwargs["testing_criteria"]
+    assert criteria[0]["data_mapping"] == {
+        "query": "{{item.query}}",
+        "response": "{{item.response}}",
+    }
+    assert criteria[1]["evaluator_name"] == "builtin.intent_resolution"
+    assert criteria[1]["data_mapping"]["tool_definitions"] == "{{item.tool_definitions}}"
+    assert created_run_kwargs["data_source"] == {
+        "type": "azure_ai_traces",
+        "agent_id": "homestyle-agent:1",
+        "max_traces": 25,
+        "lookback_hours": 6,
+    }

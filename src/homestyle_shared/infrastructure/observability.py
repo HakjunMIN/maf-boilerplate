@@ -14,6 +14,7 @@ _AGENT_FRAMEWORK_OTEL_CONFIGURED = False
 _AGENT_FRAMEWORK_INSTRUMENTATION_ENABLED = False
 _APPLICATION_OTEL_LOGGING_HANDLER_MARKER = "_application_otel_logging_handler"
 _OTEL_INTERNAL_LOGGER_PREFIXES = ("opentelemetry.", "grpc")
+_AZURE_SDK_LOGGER_PREFIX = "azure"
 _DEFAULT_TRACER_NAME = __name__
 _OTLP_EXPORTER_ENV_VARS = (
     "OTEL_EXPORTER_OTLP_ENDPOINT",
@@ -54,6 +55,7 @@ def configure_process_observability(
         stream=sys.stdout,
         force=reset_logging,
     )
+    _quiet_azure_sdk_http_logs()
     structlog.configure(
         processors=[
             structlog.contextvars.merge_contextvars,
@@ -119,6 +121,10 @@ class _RequestSpan(Protocol):
 def _resolve_log_level(log_level: str) -> int:
     normalized_level = log_level.strip().upper() if log_level.strip() else "INFO"
     return getattr(logging, normalized_level, logging.INFO)
+
+
+def _quiet_azure_sdk_http_logs() -> None:
+    logging.getLogger(_AZURE_SDK_LOGGER_PREFIX).setLevel(logging.WARNING)
 
 
 def _configure_azure_monitor(connection_string: str) -> None:
@@ -223,6 +229,7 @@ def _apply_agent_framework_observability_env(env: Mapping[str, str]) -> None:
 
 def _is_agent_framework_observability_env_var(name: str) -> bool:
     return name.startswith("OTEL_") or name in {
+        "AZURE_EXPERIMENTAL_ENABLE_GENAI_TRACING",
         "ENABLE_CONSOLE_EXPORTERS",
         "ENABLE_INSTRUMENTATION",
         "ENABLE_SENSITIVE_DATA",

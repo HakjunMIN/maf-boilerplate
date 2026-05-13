@@ -9,8 +9,13 @@ from uuid import uuid4
 from aiohttp import ContentTypeError, web
 import structlog
 
+from homestyle_shared.infrastructure.observability import start_request_span
+
 _MAX_QUESTION_LENGTH = 500
 _LOGGER = structlog.get_logger("homestyle_agent_http_api")
+_TRACE_EVALUATION_SPAN_NAME = "invoke_agent"
+_TRACE_EVALUATION_TRACER_NAME = "homestyle_agent.trace_evaluation"
+_DEFAULT_TRACE_AGENT_NAME = "homestyle-agent"
 _PROBLEM_EXCEPTIONS: dict[int, type[web.HTTPException]] = {
     400: web.HTTPBadRequest,
     502: web.HTTPBadGateway,
@@ -59,6 +64,8 @@ class InMemorySessionStore:
 _RUNTIME_KEY = web.AppKey("runtime", AnswerRuntime)
 _SESSION_STORE_KEY = web.AppKey("session_store", InMemorySessionStore)
 _AUTHENTICATE_REQUEST_KEY = web.AppKey("authenticate_request", object)
+_ENABLE_TRACE_EVALUATION_KEY = web.AppKey("enable_trace_evaluation", bool)
+_TRACE_AGENT_ID_KEY = web.AppKey("trace_agent_id", str)
 
 
 def create_app(
@@ -66,11 +73,15 @@ def create_app(
     runtime: AnswerRuntime,
     session_store: InMemorySessionStore,
     authenticate_request: AuthenticateRequest,
+    enable_trace_evaluation: bool = False,
+    trace_agent_id: str = "homestyle-agent:1",
 ) -> web.Application:
     app = web.Application()
     app[_RUNTIME_KEY] = runtime
     app[_SESSION_STORE_KEY] = session_store
     app[_AUTHENTICATE_REQUEST_KEY] = authenticate_request
+    app[_ENABLE_TRACE_EVALUATION_KEY] = enable_trace_evaluation
+    app[_TRACE_AGENT_ID_KEY] = trace_agent_id
     app.router.add_post("/ask", _handle_ask)
     app.on_cleanup.append(_close_runtime)
     return app
@@ -88,10 +99,12 @@ async def _handle_ask(request: web.Request) -> web.Response:
     session_id = session_store.ensure_session(requested_session_id)
     runtime = request.app[_RUNTIME_KEY]
     try:
-        answer = await runtime.answer(
-            question,
-            correlation_id=session_id,
+        answer = await _answer_with_optional_trace_evaluation_span(
+            runtime=runtime,
+            question=question,
             session_id=session_id,
+            enable_trace_evaluation=request.app[_ENABLE_TRACE_EVALUATION_KEY],
+            trace_agent_id=request.app[_TRACE_AGENT_ID_KEY],
         )
     except Exception as error:
         _LOGGER.warning(
@@ -114,6 +127,58 @@ async def _handle_ask(request: web.Request) -> web.Response:
             "turn_count": turn_count,
         },
         dumps=_json_dumps,
+    )
+
+
+async def _answer_with_optional_trace_evaluation_span(
+    *,
+    runtime: AnswerRuntime,
+    question: str,
+    session_id: str,
+    enable_trace_evaluation: bool,
+    trace_agent_id: str,
+) -> str:
+    if not enable_trace_evaluation:
+        return await runtime.answer(
+            question,
+            correlation_id=session_id,
+            session_id=session_id,
+        )
+
+    with start_request_span(
+        _TRACE_EVALUATION_SPAN_NAME,
+        tracer_name=_TRACE_EVALUATION_TRACER_NAME,
+        attributes={
+            "gen_ai.operation.name": "invoke_agent",
+            "gen_ai.agent.id": trace_agent_id,
+            "gen_ai.agent.name": trace_agent_id.split(":", maxsplit=1)[0]
+            or _DEFAULT_TRACE_AGENT_NAME,
+            "gen_ai.conversation.id": session_id,
+            "gen_ai.input.messages": _gen_ai_messages_json("user", question),
+        },
+    ) as span:
+        answer = await runtime.answer(
+            question,
+            correlation_id=session_id,
+            session_id=session_id,
+        )
+        span.set_attribute("gen_ai.output.messages", _gen_ai_messages_json("assistant", answer))
+        return answer
+
+
+def _gen_ai_messages_json(role: str, text: str) -> str:
+    return _json_dumps(
+        [
+            {
+                "role": role,
+                "content": [
+                    {
+                        "type": "text",
+                        "text": text,
+                    }
+                ],
+            }
+        ]
     )
 
 
