@@ -1,6 +1,8 @@
 import argparse
 import asyncio
 import json
+import math
+import os
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -23,6 +25,12 @@ from homestyle_agent.application.grounded_query import select_grounding_sections
 from homestyle_agent.infrastructure.retrieval import AzureSearchSectionRetriever  # noqa: E402
 from homestyle_shared.domain.indexing import SectionDocument  # noqa: E402
 from homestyle_shared.infrastructure.azure_identity import build_azure_credential  # noqa: E402
+from homestyle_shared.infrastructure.observability import (  # noqa: E402
+    StructuredLogger,
+    build_logger,
+    configure_process_observability,
+    start_request_span,
+)
 from homestyle_shared.infrastructure.openai import AzureOpenAIEmbedder  # noqa: E402
 from homestyle_shared.infrastructure.settings import AzureRagSettings, load_environment  # noqa: E402
 
@@ -33,8 +41,24 @@ EVALUATOR_CHOICES = (*DEFAULT_EVALUATORS, "similarity")
 EVALUATION_API_KEY_ENV_VARS = ("AZURE_AI_EVALUATION_OPENAI_API_KEY", "AZURE_OPENAI_API_KEY")
 EVALUATION_DEPLOYMENT_ENV_VAR = "AZURE_AI_EVALUATION_OPENAI_DEPLOYMENT"
 EVALUATION_REASONING_MODEL_ENV_VAR = "AZURE_AI_EVALUATION_REASONING_MODEL"
+AZURE_AI_PROJECT_ENDPOINT_ENV_VARS = (
+    "AZURE_AI_PROJECT_ENDPOINT",
+    "AZURE_AI_PROJECT_URL",
+    "AZURE_AI_FOUNDRY_PROJECT_ENDPOINT",
+)
+AZURE_IDENTITY_ENV_VARS = (
+    "AZURE_TENANT_ID",
+    "AZURE_CLIENT_ID",
+    "AZURE_CLIENT_SECRET",
+    "AZURE_CLIENT_CERTIFICATE_PATH",
+    "AZURE_USERNAME",
+    "AZURE_PASSWORD",
+)
 MAX_CONTEXT_CHARS = 12_000
 MAX_SOURCE_CONTENT_CHARS = 2_000
+EVALUATION_NAME = "ask_grounded_qa"
+EVALUATION_SPAN_NAME = "homestyle.eval.grounded_qa"
+EVALUATION_TRACER_NAME = "homestyle_agent.evaluation"
 
 
 @dataclass(frozen=True)
@@ -76,6 +100,12 @@ async def main() -> None:
     args = parse_args()
     env = load_environment()
     settings = AzureRagSettings.from_env(env)
+    configure_process_observability(
+        log_level=settings.log_level,
+        application_insights_connection_string=settings.application_insights_connection_string,
+        env=env,
+    )
+    logger = build_logger("grounded_qa_evaluation")
     questions, configured_endpoint = load_questions(args.questions)
     endpoint = args.ask_endpoint or configured_endpoint or "http://127.0.0.1:8080/ask"
     paths = make_eval_paths(args.output_dir)
@@ -126,6 +156,15 @@ async def main() -> None:
         env=env,
         evaluator_names=args.evaluators,
     )
+    emit_evaluation_telemetry(
+        result=result,
+        dataset_path=paths.dataset_path,
+        results_path=paths.results_path,
+        evaluator_names=args.evaluators,
+        row_count=len(rows),
+        logger=logger,
+    )
+    flush_observability()
     print(f"Wrote evaluation results to {paths.results_path}")
     print(json.dumps(result.get("metrics", {}), ensure_ascii=False, indent=2))
 
@@ -249,6 +288,7 @@ def run_evaluation(
 
     api_key = read_evaluation_api_key(env)
     sync_credential = None if api_key else build_sync_azure_credential(settings)
+    foundry_upload_credential = None
     evaluator_deployment = read_evaluation_deployment(env, settings)
     model_config_values: dict[str, Any] = {
         "azure_endpoint": settings.azure_openai_endpoint,
@@ -284,16 +324,101 @@ def run_evaluation(
             }
         }
     }
+    evaluate_kwargs: dict[str, Any] = {
+        "data": str(dataset_path),
+        "evaluators": evaluators,
+        "evaluation_name": EVALUATION_NAME,
+        "evaluator_config": evaluator_config,
+        "output_path": str(results_path),
+    }
+    azure_ai_project = read_azure_ai_project(env)
+    if azure_ai_project is not None:
+        apply_azure_identity_environment(env)
+        evaluate_kwargs["azure_ai_project"] = azure_ai_project
+        foundry_upload_credential = sync_credential or build_sync_azure_credential(settings)
+        evaluate_kwargs["credential"] = foundry_upload_credential
+
     try:
-        result = evaluate(
-            data=str(dataset_path),
-            evaluators=evaluators,
-            evaluator_config=evaluator_config,
-            output_path=str(results_path),
-        )
+        result = evaluate(**evaluate_kwargs)
         return dict(result)
     finally:
         close_if_present_sync(sync_credential)
+        if foundry_upload_credential is not sync_credential:
+            close_if_present_sync(foundry_upload_credential)
+
+
+def emit_evaluation_telemetry(
+    *,
+    result: Mapping[str, Any],
+    dataset_path: Path,
+    results_path: Path,
+    evaluator_names: Sequence[str],
+    row_count: int,
+    logger: StructuredLogger,
+) -> None:
+    raw_metrics = result.get("metrics", {})
+    metrics = collect_numeric_metrics(raw_metrics if isinstance(raw_metrics, Mapping) else {})
+    attributes: dict[str, object] = {
+        "homestyle.eval.name": EVALUATION_NAME,
+        "homestyle.eval.row_count": row_count,
+        "homestyle.eval.evaluator_count": len(evaluator_names),
+        "homestyle.eval.evaluators": ",".join(evaluator_names),
+        "homestyle.eval.dataset_path": str(dataset_path),
+        "homestyle.eval.results_path": str(results_path),
+    }
+    for name, value in metrics.items():
+        attributes[f"homestyle.eval.metric.{sanitize_metric_name(name)}"] = value
+
+    with start_request_span(
+        EVALUATION_SPAN_NAME,
+        tracer_name=EVALUATION_TRACER_NAME,
+        attributes=attributes,
+    ) as span:
+        add_event = getattr(span, "add_event", None)
+        if add_event is not None:
+            for name, value in metrics.items():
+                add_event(
+                    "homestyle.eval.metric",
+                    {
+                        "homestyle.eval.metric.name": name,
+                        "homestyle.eval.metric.value": value,
+                    },
+                )
+
+    logger.info(
+        "grounded_qa_evaluation_completed",
+        evaluation_name=EVALUATION_NAME,
+        row_count=row_count,
+        evaluator_names=list(evaluator_names),
+        metrics=metrics,
+        dataset_path=str(dataset_path),
+        results_path=str(results_path),
+    )
+
+
+def collect_numeric_metrics(metrics: Mapping[str, Any], prefix: str = "") -> dict[str, float]:
+    collected: dict[str, float] = {}
+    for name, value in metrics.items():
+        metric_name = f"{prefix}.{name}" if prefix else str(name)
+        if isinstance(value, Mapping):
+            collected.update(collect_numeric_metrics(value, metric_name))
+        elif isinstance(value, bool):
+            continue
+        elif isinstance(value, (int, float)) and math.isfinite(value):
+            collected[metric_name] = float(value)
+    return collected
+
+
+def sanitize_metric_name(name: str) -> str:
+    return "".join(character if character.isalnum() else "_" for character in name)
+
+
+def flush_observability() -> None:
+    from opentelemetry import trace
+
+    force_flush = getattr(trace.get_tracer_provider(), "force_flush", None)
+    if force_flush is not None:
+        force_flush()
 
 
 def build_search_credential(
@@ -318,6 +443,25 @@ def read_evaluation_deployment(env: Mapping[str, str], settings: AzureRagSetting
     if value:
         return value
     return settings.azure_openai_chat_deployment
+
+
+def read_azure_ai_project(env: Mapping[str, str]) -> str | None:
+    for name in AZURE_AI_PROJECT_ENDPOINT_ENV_VARS:
+        value = env.get(name, "").strip()
+        if value:
+            return value
+    return None
+
+
+def apply_azure_identity_environment(env: Mapping[str, str]) -> None:
+    for name in AZURE_IDENTITY_ENV_VARS:
+        value = env.get(name, "").strip()
+        if value:
+            os.environ[name] = value
+
+    managed_identity_client_id = env.get("MANAGED_IDENTITY_CLIENT_ID", "").strip()
+    if managed_identity_client_id and not os.environ.get("AZURE_CLIENT_ID", "").strip():
+        os.environ["AZURE_CLIENT_ID"] = managed_identity_client_id
 
 
 def is_reasoning_evaluator_model(env: Mapping[str, str], deployment: str) -> bool:

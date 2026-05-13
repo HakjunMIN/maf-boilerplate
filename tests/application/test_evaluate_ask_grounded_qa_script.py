@@ -1,6 +1,9 @@
 import importlib.util
+import os
+import sys
+from contextlib import contextmanager
 from pathlib import Path
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 
 from homestyle_shared.domain.indexing import SectionDocument
 
@@ -103,6 +106,153 @@ def test_read_evaluation_deployment_prefers_dedicated_judge_deployment() -> None
     assert deployment == "gpt-4o-mini-judge"
 
 
+def test_read_azure_ai_project_prefers_project_endpoint() -> None:
+    script = load_script()
+
+    project = script.read_azure_ai_project(
+        {
+            "AZURE_AI_PROJECT_ENDPOINT": " https://foundry.example/projects/project-1 ",
+            "AZURE_AI_PROJECT_URL": "https://ignored.example/projects/project-2",
+        }
+    )
+
+    assert project == "https://foundry.example/projects/project-1"
+
+
+def test_run_evaluation_uploads_to_foundry_when_project_endpoint_is_configured(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    script = load_script()
+    captured_kwargs: dict[str, object] = {}
+    fake_upload_credential = object()
+    monkeypatch.delenv("AZURE_TENANT_ID", raising=False)
+    monkeypatch.setattr(script, "build_sync_azure_credential", lambda _: fake_upload_credential)
+
+    class FakeModelConfiguration:
+        def __init__(self, **kwargs: object) -> None:
+            self.kwargs = kwargs
+
+    class FakeEvaluator:
+        def __init__(self, model_config: object, **kwargs: object) -> None:
+            self.model_config = model_config
+            self.kwargs = kwargs
+
+    def fake_evaluate(**kwargs: object) -> dict[str, object]:
+        captured_kwargs.update(kwargs)
+        return {"metrics": {"groundedness": 4.0}}
+
+    fake_module = SimpleNamespace(
+        AzureOpenAIModelConfiguration=FakeModelConfiguration,
+        CoherenceEvaluator=FakeEvaluator,
+        FluencyEvaluator=FakeEvaluator,
+        GroundednessEvaluator=FakeEvaluator,
+        RelevanceEvaluator=FakeEvaluator,
+        SimilarityEvaluator=FakeEvaluator,
+        evaluate=fake_evaluate,
+    )
+    monkeypatch.setitem(sys.modules, "azure.ai.evaluation", fake_module)
+    settings = script.AzureRagSettings(
+        azure_openai_endpoint="https://openai.example",
+        azure_openai_api_version="2024-10-01-preview",
+        azure_openai_chat_deployment="gpt-4o-mini",
+        azure_openai_embedding_deployment="embedding",
+        azure_openai_vision_deployment="vision",
+        azure_search_endpoint="https://search.example",
+        azure_search_index_name="index",
+    )
+
+    result = script.run_evaluation(
+        dataset_path=tmp_path / "dataset.jsonl",
+        results_path=tmp_path / "results.json",
+        settings=settings,
+        env={
+            "AZURE_AI_EVALUATION_OPENAI_API_KEY": "eval-key",
+            "AZURE_AI_PROJECT_ENDPOINT": "https://foundry.example/projects/project-1",
+            "AZURE_TENANT_ID": "tenant-id",
+        },
+        evaluator_names=["groundedness"],
+    )
+
+    assert result == {"metrics": {"groundedness": 4.0}}
+    assert captured_kwargs["evaluation_name"] == "ask_grounded_qa"
+    assert captured_kwargs["azure_ai_project"] == "https://foundry.example/projects/project-1"
+    assert captured_kwargs["credential"] is fake_upload_credential
+    assert captured_kwargs["output_path"] == str(tmp_path / "results.json")
+    assert os.environ["AZURE_TENANT_ID"] == "tenant-id"
+
+
+def test_run_evaluation_keeps_foundry_upload_disabled_without_project_endpoint(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    script = load_script()
+    captured_kwargs: dict[str, object] = {}
+
+    class FakeModelConfiguration:
+        def __init__(self, **kwargs: object) -> None:
+            self.kwargs = kwargs
+
+    class FakeEvaluator:
+        def __init__(self, model_config: object, **kwargs: object) -> None:
+            self.model_config = model_config
+            self.kwargs = kwargs
+
+    def fake_evaluate(**kwargs: object) -> dict[str, object]:
+        captured_kwargs.update(kwargs)
+        return {"metrics": {}}
+
+    monkeypatch.setitem(
+        sys.modules,
+        "azure.ai.evaluation",
+        SimpleNamespace(
+            AzureOpenAIModelConfiguration=FakeModelConfiguration,
+            CoherenceEvaluator=FakeEvaluator,
+            FluencyEvaluator=FakeEvaluator,
+            GroundednessEvaluator=FakeEvaluator,
+            RelevanceEvaluator=FakeEvaluator,
+            SimilarityEvaluator=FakeEvaluator,
+            evaluate=fake_evaluate,
+        ),
+    )
+    settings = script.AzureRagSettings(
+        azure_openai_endpoint="https://openai.example",
+        azure_openai_api_version="2024-10-01-preview",
+        azure_openai_chat_deployment="gpt-4o-mini",
+        azure_openai_embedding_deployment="embedding",
+        azure_openai_vision_deployment="vision",
+        azure_search_endpoint="https://search.example",
+        azure_search_index_name="index",
+    )
+
+    script.run_evaluation(
+        dataset_path=tmp_path / "dataset.jsonl",
+        results_path=tmp_path / "results.json",
+        settings=settings,
+        env={"AZURE_AI_EVALUATION_OPENAI_API_KEY": "eval-key"},
+        evaluator_names=["groundedness"],
+    )
+
+    assert "azure_ai_project" not in captured_kwargs
+
+
+def test_apply_azure_identity_environment_maps_managed_identity_client_id(
+    monkeypatch,
+) -> None:
+    script = load_script()
+    monkeypatch.delenv("AZURE_CLIENT_ID", raising=False)
+
+    script.apply_azure_identity_environment(
+        {
+            "AZURE_TENANT_ID": " tenant-id ",
+            "MANAGED_IDENTITY_CLIENT_ID": " managed-client-id ",
+        }
+    )
+
+    assert os.environ["AZURE_TENANT_ID"] == "tenant-id"
+    assert os.environ["AZURE_CLIENT_ID"] == "managed-client-id"
+
+
 def test_is_reasoning_evaluator_model_uses_env_override_or_name_heuristic() -> None:
     script = load_script()
 
@@ -112,3 +262,93 @@ def test_is_reasoning_evaluator_model_uses_env_override_or_name_heuristic() -> N
         {"AZURE_AI_EVALUATION_REASONING_MODEL": "false"},
         "gpt-5-chat",
     ) is False
+
+
+def test_collect_numeric_metrics_flattens_finite_numbers_only() -> None:
+    script = load_script()
+
+    metrics = script.collect_numeric_metrics(
+        {
+            "groundedness": 4,
+            "relevance": {"mean": 3.5},
+            "flag": True,
+            "missing": None,
+            "not_number": "4",
+            "infinite": float("inf"),
+        }
+    )
+
+    assert metrics == {
+        "groundedness": 4.0,
+        "relevance.mean": 3.5,
+    }
+
+
+def test_emit_evaluation_telemetry_sends_summary_without_row_payload(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    script = load_script()
+    captured_spans: list[dict[str, object]] = []
+    captured_events: list[tuple[str, dict[str, object]]] = []
+    captured_logs: list[tuple[str, dict[str, object]]] = []
+
+    class FakeSpan:
+        def add_event(self, name: str, attributes: dict[str, object]) -> None:
+            captured_events.append((name, attributes))
+
+    @contextmanager
+    def fake_start_request_span(name: str, *, tracer_name: str, attributes: dict[str, object]):
+        captured_spans.append(
+            {
+                "name": name,
+                "tracer_name": tracer_name,
+                "attributes": attributes,
+            }
+        )
+        yield FakeSpan()
+
+    class FakeLogger:
+        def info(self, event: str, **event_kw: object) -> None:
+            captured_logs.append((event, event_kw))
+
+    monkeypatch.setattr(script, "start_request_span", fake_start_request_span)
+    result = {
+        "metrics": {"groundedness": 4.0, "relevance": {"mean": 3.5}},
+        "rows": [{"query": "민감한 질문", "response": "민감한 답변"}],
+    }
+
+    script.emit_evaluation_telemetry(
+        result=result,
+        dataset_path=tmp_path / "dataset.jsonl",
+        results_path=tmp_path / "results.json",
+        evaluator_names=["groundedness", "relevance"],
+        row_count=2,
+        logger=FakeLogger(),
+    )
+
+    assert captured_spans[0]["name"] == "homestyle.eval.grounded_qa"
+    attributes = captured_spans[0]["attributes"]
+    assert attributes["homestyle.eval.row_count"] == 2
+    assert attributes["homestyle.eval.evaluators"] == "groundedness,relevance"
+    assert attributes["homestyle.eval.metric.groundedness"] == 4.0
+    assert attributes["homestyle.eval.metric.relevance_mean"] == 3.5
+    assert captured_events == [
+        (
+            "homestyle.eval.metric",
+            {
+                "homestyle.eval.metric.name": "groundedness",
+                "homestyle.eval.metric.value": 4.0,
+            },
+        ),
+        (
+            "homestyle.eval.metric",
+            {
+                "homestyle.eval.metric.name": "relevance.mean",
+                "homestyle.eval.metric.value": 3.5,
+            },
+        ),
+    ]
+    assert captured_logs[0][0] == "grounded_qa_evaluation_completed"
+    assert "민감한 질문" not in str(captured_logs)
+    assert "민감한 답변" not in str(captured_logs)

@@ -186,10 +186,26 @@ OTEL_RESOURCE_ATTRIBUTES=deployment.environment=local,service.namespace=homestyl
 OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:18889
 ```
 
+grounded QA 평가 결과도 같은 OTLP 설정을 사용합니다. 평가 스크립트는 결과 파일을 그대로 유지하면서 summary metric만 `homestyle.eval.grounded_qa` span과 `grounded_qa_evaluation_completed` log로 내보냅니다.
+
+```bash
+uv run python scripts/evaluate_ask_grounded_qa.py
+```
+
+Azure AI Foundry project에도 evaluation run을 남기려면 project endpoint를 추가합니다.
+
+```dotenv
+AZURE_AI_PROJECT_ENDPOINT=https://<foundry-project-endpoint>
+```
+
+`AZURE_AI_PROJECT_URL` 또는 `AZURE_AI_FOUNDRY_PROJECT_ENDPOINT`도 같은 용도로 사용할 수 있습니다.
+업로드 시 Azure AI Evaluation SDK에는 `.env`의 `AZURE_TENANT_ID`를 반영한 credential을 명시적으로 전달합니다. 그래도 tenant mismatch가 나면 Azure CLI 계정이 해당 tenant에 로그인되어 있는지 확인하고 `az login --tenant <tenant-id>`로 다시 로그인합니다.
+
 적합한 경우:
 
 - 로컬 개발 중일 때
 - 에이전트 실행의 trace, log, metric을 직접 확인하고 싶을 때
+- grounded QA eval metric을 Aspire Dashboard에서 확인하고 싶을 때
 - Azure Monitor 없이 tool span, model call을 검증하고 싶을 때
 
 ### Console exporter만 사용
