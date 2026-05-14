@@ -229,6 +229,8 @@ uv run python scripts/evaluate_ask_grounded_qa.py --foundry-trace-only
 
 Foundry trace evaluation은 Application Insights에 `gen_ai.operation.name=invoke_agent`, `gen_ai.agent.id`, `gen_ai.input.messages`, `gen_ai.output.messages`가 있는 trace를 대상으로 합니다. 현재 저장소의 일반 summary eval telemetry와는 별개입니다. `/ask` 경로는 `ENABLE_FOUNDRY_TRACE_EVALUATION=true`일 때만 query/response 원문을 GenAI semantic convention 속성으로 내보냅니다. Azure Monitor exporter가 이 GenAI 속성을 전송하도록 `AZURE_EXPERIMENTAL_ENABLE_GENAI_TRACING=true`도 함께 설정합니다.
 
+Agent Framework/Azure Monitor exporter는 민감 데이터 수집이 꺼져 있으면 message `content`를 빈 배열로 마스킹할 수 있습니다. API 서버는 `ENABLE_FOUNDRY_TRACE_EVALUATION=true`일 때 runtime observability 설정에 `ENABLE_SENSITIVE_DATA=true`를 함께 적용합니다. 이미 App Insights에 저장된 old trace는 수정되지 않으므로 서버 재시작 후 새 `/ask` 요청으로 생성된 trace를 평가해야 합니다.
+
 ### Console exporter만 사용
 
 collector 없이 로컬에서 OTEL 출력을 보고 싶다면 아래처럼 설정합니다.

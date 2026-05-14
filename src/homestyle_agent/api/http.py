@@ -171,12 +171,7 @@ def _gen_ai_messages_json(role: str, text: str) -> str:
         [
             {
                 "role": role,
-                "content": [
-                    {
-                        "type": "text",
-                        "text": text,
-                    }
-                ],
+                "parts": [{"type": "text", "content": text}],
             }
         ]
     )

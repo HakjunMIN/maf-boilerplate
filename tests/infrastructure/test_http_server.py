@@ -206,3 +206,5 @@ async def test_build_app_from_env_enables_trace_evaluation_from_env(
 
     assert response.status == 200
     assert captured_attributes[0]["gen_ai.agent.id"] == "homestyle-agent:prod"
+    assert FakeConfiguredRuntime.captured_observability_environment is not None
+    assert FakeConfiguredRuntime.captured_observability_environment["ENABLE_SENSITIVE_DATA"] == "true"

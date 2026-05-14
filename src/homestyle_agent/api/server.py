@@ -10,6 +10,7 @@ from homestyle_shared.infrastructure.settings import AzureRagSettings, load_envi
 
 _AUTH_TOKEN_ENV = "HOMESTYLE_AGENT_BEARER_TOKEN"
 _ENABLE_TRACE_EVALUATION_ENV = "ENABLE_FOUNDRY_TRACE_EVALUATION"
+_ENABLE_SENSITIVE_DATA_ENV = "ENABLE_SENSITIVE_DATA"
 _TRACE_AGENT_ID_ENV = "AZURE_AI_EVALUATION_TRACE_AGENT_ID"
 
 
@@ -17,11 +18,18 @@ def build_app_from_env(env: Mapping[str, str] | None = None) -> web.Application:
     values = load_environment(env)
     settings = AzureRagSettings.from_env(values)
     token = _read_required_token(values)
+    enable_trace_evaluation = _is_enabled(values.get(_ENABLE_TRACE_EVALUATION_ENV, ""))
     return create_app(
-        runtime=AzureRagRuntime(settings, observability_environment=values),
+        runtime=AzureRagRuntime(
+            settings,
+            observability_environment=_build_observability_environment(
+                values,
+                enable_trace_evaluation=enable_trace_evaluation,
+            ),
+        ),
         session_store=InMemorySessionStore(),
         authenticate_request=bearer_token_auth(token),
-        enable_trace_evaluation=_is_enabled(values.get(_ENABLE_TRACE_EVALUATION_ENV, "")),
+        enable_trace_evaluation=enable_trace_evaluation,
         trace_agent_id=values.get(_TRACE_AGENT_ID_ENV, "homestyle-agent:1").strip()
         or "homestyle-agent:1",
     )
@@ -54,6 +62,17 @@ def _read_required_token(env: Mapping[str, str]) -> str:
 
 def _is_enabled(value: str) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _build_observability_environment(
+    values: Mapping[str, str],
+    *,
+    enable_trace_evaluation: bool,
+) -> dict[str, str]:
+    observability_environment = dict(values)
+    if enable_trace_evaluation:
+        observability_environment[_ENABLE_SENSITIVE_DATA_ENV] = "true"
+    return observability_environment
 
 
 def _unauthorized_response() -> web.HTTPUnauthorized:

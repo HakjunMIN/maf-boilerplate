@@ -1,3 +1,4 @@
+import json
 from contextlib import contextmanager
 
 import pytest
@@ -122,8 +123,14 @@ async def test_http_api_emits_gen_ai_trace_span_when_enabled(monkeypatch) -> Non
     assert attributes["gen_ai.agent.name"] == "homestyle-agent"
     assert attributes["gen_ai.conversation.id"] == body["session_id"]
     assert "거실 스타일링" in str(attributes["gen_ai.input.messages"])
+    input_messages = json.loads(str(attributes["gen_ai.input.messages"]))
+    assert input_messages[0]["parts"] == [{"type": "text", "content": "거실 스타일링"}]
     span = captured_spans[0]["span"]
     assert "answer for 거실 스타일링" in span.attributes["gen_ai.output.messages"]
+    output_messages = json.loads(str(span.attributes["gen_ai.output.messages"]))
+    assert output_messages[0]["parts"] == [
+        {"type": "text", "content": "answer for 거실 스타일링"}
+    ]
 
 
 @pytest.mark.asyncio

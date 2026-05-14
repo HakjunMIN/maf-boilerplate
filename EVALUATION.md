@@ -117,9 +117,13 @@ Foundry 평가 업로드를 켜려면 아래 중 하나를 설정:
 - ENABLE_FOUNDRY_TRACE_EVALUATION
   - `/ask` 요청 경로에서 Foundry trace evaluation용 GenAI semantic span을 내보낼지 결정합니다.
   - query/response 원문이 Application Insights trace 속성에 포함될 수 있으므로 기본값은 false입니다.
+  - 이 값이 true이면 API 서버는 evaluator가 읽을 수 있도록 `ENABLE_SENSITIVE_DATA=true`를 runtime observability 설정에 함께 적용합니다.
 - AZURE_EXPERIMENTAL_ENABLE_GENAI_TRACING
   - Azure Monitor exporter가 GenAI trace 속성을 전송하도록 켭니다.
   - 운영 trace evaluation을 실행하려면 `ENABLE_FOUNDRY_TRACE_EVALUATION=true`와 함께 true로 둡니다.
+- ENABLE_SENSITIVE_DATA
+  - Agent Framework/Azure Monitor exporter가 `gen_ai.input.messages`, `gen_ai.output.messages`의 content를 비우지 않도록 허용합니다.
+  - `ENABLE_FOUNDRY_TRACE_EVALUATION=true`로 API 서버를 시작하면 자동으로 true가 적용됩니다.
 - AZURE_AI_EVALUATION_TRACE_AGENT_ID
   - trace span의 `gen_ai.agent.id` 값입니다. 예: `homestyle-agent:1`
 - AZURE_AI_EVALUATION_TRACE_LOOKBACK_HOURS
@@ -259,6 +263,7 @@ uv run python scripts/evaluate_ask_grounded_qa.py --foundry-upload-mode disabled
 - 프로젝트 managed identity가 Application Insights와 연결된 Log Analytics workspace에 Log Analytics Reader 권한을 가져야 합니다.
 - 운영 서버에서 `ENABLE_FOUNDRY_TRACE_EVALUATION=true`를 명시해야 `/ask` trace에 평가용 payload가 포함됩니다.
 - Azure Monitor exporter가 GenAI 속성을 전송하도록 `AZURE_EXPERIMENTAL_ENABLE_GENAI_TRACING=true`도 설정합니다.
+- trace evaluation payload는 query/response 원문을 포함하므로 API 서버는 `ENABLE_FOUNDRY_TRACE_EVALUATION=true`일 때 `ENABLE_SENSITIVE_DATA=true`를 함께 적용합니다.
 - 평가 대상 trace에는 GenAI semantic convention 속성이 있어야 합니다.
   - `gen_ai.operation.name=invoke_agent`
   - `gen_ai.agent.id=<agent-id>`
@@ -337,6 +342,7 @@ Foundry endpoint와 OTLP 설정을 동시에 켜면 됩니다.
 2. `AZURE_AI_EVALUATION_TRACE_AGENT_ID`가 trace의 `gen_ai.agent.id`와 일치하는지 확인
 3. lookback 시간 안에 trace가 있는지 확인
 4. trace span에 `gen_ai.operation.name=invoke_agent`, `gen_ai.input.messages`, `gen_ai.output.messages`가 있는지 확인
+5. App Insights의 `gen_ai.input.messages` 또는 `gen_ai.output.messages`가 `{"content": []}`로 보이면 민감 payload가 마스킹된 것입니다. API 서버를 `ENABLE_FOUNDRY_TRACE_EVALUATION=true`, `AZURE_EXPERIMENTAL_ENABLE_GENAI_TRACING=true`로 재시작한 뒤 새 `/ask` 트래픽을 발생시키고 새 lookback window로 다시 평가하세요.
 
 ## 9. 보안 및 데이터 취급
 
