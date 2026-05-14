@@ -28,8 +28,8 @@ def isolate_observability_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         False,
     )
     monkeypatch.setattr(
-        "homestyle_shared.infrastructure.observability._AGENT_FRAMEWORK_INSTRUMENTATION_ENABLED",
-        False,
+        "homestyle_shared.infrastructure.observability._AZURE_MONITOR_CONNECTION_STRING",
+        None,
     )
 
 
@@ -61,18 +61,23 @@ def test_configure_process_observability_quiets_azure_sdk_http_logs() -> None:
         azure_logger.setLevel(original_level)
 
 
-def test_configure_process_observability_initializes_azure_monitor(
+def test_configure_process_observability_configures_azure_monitor_exporters(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    fake_exporters = [object()]
     captured_connection_strings: list[str] = []
+    captured_provider_calls: list[tuple[list[object] | None, bool]] = []
 
     monkeypatch.setattr(
-        "homestyle_shared.infrastructure.observability._AZURE_MONITOR_CONNECTION_STRING",
-        None,
+        "homestyle_shared.infrastructure.observability._create_azure_monitor_exporters",
+        lambda connection_string: captured_connection_strings.append(connection_string)
+        or fake_exporters,
     )
     monkeypatch.setattr(
-        "homestyle_shared.infrastructure.observability._configure_azure_monitor",
-        captured_connection_strings.append,
+        "homestyle_shared.infrastructure.observability._configure_agent_framework_otel_providers",
+        lambda *, exporters, enable_sensitive_data: captured_provider_calls.append(
+            (exporters, enable_sensitive_data)
+        ),
     )
 
     configure_process_observability(
@@ -81,24 +86,25 @@ def test_configure_process_observability_initializes_azure_monitor(
     )
 
     assert captured_connection_strings == ["InstrumentationKey=test"]
+    assert captured_provider_calls == [(fake_exporters, False)]
 
 
-def test_configure_process_observability_enables_agent_framework_instrumentation_for_app_insights(
+def test_configure_process_observability_configures_azure_monitor_otel_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls: list[object] = []
+    calls: list[str] = []
 
     monkeypatch.setattr(
-        "homestyle_shared.infrastructure.observability._AZURE_MONITOR_CONNECTION_STRING",
-        None,
+        "homestyle_shared.infrastructure.observability._create_azure_monitor_exporters",
+        lambda _: [object()],
     )
     monkeypatch.setattr(
-        "homestyle_shared.infrastructure.observability._configure_azure_monitor",
-        lambda _: calls.append("azure_monitor"),
+        "homestyle_shared.infrastructure.observability._configure_agent_framework_otel_providers",
+        lambda *, exporters, enable_sensitive_data: calls.append("configure_otel_providers"),
     )
     monkeypatch.setattr(
-        "homestyle_shared.infrastructure.observability._enable_agent_framework_instrumentation",
-        calls.append,
+        "homestyle_shared.infrastructure.observability._attach_application_otel_logging_handler",
+        lambda _: calls.append("attach_application_logging"),
     )
 
     configure_process_observability(
@@ -108,7 +114,11 @@ def test_configure_process_observability_enables_agent_framework_instrumentation
         application_insights_connection_string="InstrumentationKey=test",
     )
 
-    assert calls == ["azure_monitor", False]
+    assert calls == [
+        "configure_otel_providers",
+        "attach_application_logging",
+        "attach_application_logging",
+    ]
 
 
 def test_configure_process_observability_passes_sensitive_data_env_to_agent_framework(
@@ -117,16 +127,14 @@ def test_configure_process_observability_passes_sensitive_data_env_to_agent_fram
     captured_sensitive_data_values: list[bool] = []
 
     monkeypatch.setattr(
-        "homestyle_shared.infrastructure.observability._AZURE_MONITOR_CONNECTION_STRING",
-        None,
+        "homestyle_shared.infrastructure.observability._create_azure_monitor_exporters",
+        lambda _: [object()],
     )
     monkeypatch.setattr(
-        "homestyle_shared.infrastructure.observability._configure_azure_monitor",
-        lambda _: None,
-    )
-    monkeypatch.setattr(
-        "homestyle_shared.infrastructure.observability._enable_agent_framework_instrumentation",
-        captured_sensitive_data_values.append,
+        "homestyle_shared.infrastructure.observability._configure_agent_framework_otel_providers",
+        lambda *, exporters, enable_sensitive_data: captured_sensitive_data_values.append(
+            enable_sensitive_data
+        ),
     )
 
     configure_process_observability(
@@ -137,15 +145,30 @@ def test_configure_process_observability_passes_sensitive_data_env_to_agent_fram
     assert captured_sensitive_data_values == [True]
 
 
-def test_configure_process_observability_rejects_app_insights_with_otlp_exporter(
+def test_configure_process_observability_adds_app_insights_exporters_with_otlp_exporter(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+    fake_exporters = [object()]
+    captured_provider_calls: list[tuple[list[object] | None, bool]] = []
 
-    with pytest.raises(ValueError, match="APPLICATION_INSIGHTS_CONNECTION_STRING"):
-        configure_process_observability(
-            application_insights_connection_string="InstrumentationKey=test",
-        )
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._create_azure_monitor_exporters",
+        lambda _: fake_exporters,
+    )
+    monkeypatch.setattr(
+        "homestyle_shared.infrastructure.observability._configure_agent_framework_otel_providers",
+        lambda *, exporters, enable_sensitive_data: captured_provider_calls.append(
+            (exporters, enable_sensitive_data)
+        ),
+    )
+
+    configure_process_observability(
+        application_insights_connection_string="InstrumentationKey=test",
+    )
+
+    assert captured_provider_calls == [(fake_exporters, False)]
+    assert os.environ["OTEL_EXPORTER_OTLP_ENDPOINT"] == "http://localhost:4317"
 
 
 def test_configure_process_observability_configures_agent_framework_otel_for_otlp(
@@ -160,7 +183,7 @@ def test_configure_process_observability_configures_agent_framework_otel_for_otl
     )
     monkeypatch.setattr(
         "homestyle_shared.infrastructure.observability._configure_agent_framework_otel_providers",
-        lambda: calls.append("configure_otel_providers"),
+        lambda *, exporters, enable_sensitive_data: calls.append("configure_otel_providers"),
     )
     monkeypatch.setattr(
         "homestyle_shared.infrastructure.observability._attach_application_otel_logging_handler",
@@ -185,7 +208,7 @@ def test_configure_process_observability_applies_otlp_values_from_dotenv_mapping
     )
     monkeypatch.setattr(
         "homestyle_shared.infrastructure.observability._configure_agent_framework_otel_providers",
-        lambda: calls.append("configure_otel_providers"),
+        lambda *, exporters, enable_sensitive_data: calls.append("configure_otel_providers"),
     )
     monkeypatch.setattr(
         "homestyle_shared.infrastructure.observability._attach_application_otel_logging_handler",
@@ -209,16 +232,12 @@ def test_configure_process_observability_applies_azure_monitor_genai_trace_opt_i
 ) -> None:
     monkeypatch.delenv("AZURE_EXPERIMENTAL_ENABLE_GENAI_TRACING", raising=False)
     monkeypatch.setattr(
-        "homestyle_shared.infrastructure.observability._AZURE_MONITOR_CONNECTION_STRING",
-        None,
+        "homestyle_shared.infrastructure.observability._create_azure_monitor_exporters",
+        lambda _: [object()],
     )
     monkeypatch.setattr(
-        "homestyle_shared.infrastructure.observability._configure_azure_monitor",
-        lambda _: None,
-    )
-    monkeypatch.setattr(
-        "homestyle_shared.infrastructure.observability._enable_agent_framework_instrumentation",
-        lambda _: None,
+        "homestyle_shared.infrastructure.observability._configure_agent_framework_otel_providers",
+        lambda *, exporters, enable_sensitive_data: None,
     )
 
     configure_process_observability(

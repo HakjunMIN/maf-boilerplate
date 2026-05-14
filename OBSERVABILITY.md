@@ -27,11 +27,11 @@
 1. Python logging을 stdout으로 설정합니다.
 2. `structlog`를 JSON 로그 출력으로 설정합니다.
 3. 로드된 환경값에서 `OTEL_*`, `ENABLE_*` observability 변수를 프로세스 환경 변수로 복사합니다. 이 함수는 프로세스 전역 observability bootstrap이므로 이 부작용을 의도적으로 포함합니다.
-4. telemetry 백엔드 경로를 정확히 하나만 선택합니다.
-    - **Application Insights 경로**: `azure.monitor.opentelemetry.configure_azure_monitor(...)`를 호출한 뒤 `ENABLE_SENSITIVE_DATA` 값을 반영해 Agent Framework instrumentation을 켭니다.
-    - **OTLP 경로**: `agent_framework.observability.configure_otel_providers()`를 호출한 뒤 애플리케이션 로그용 OpenTelemetry logging handler를 붙입니다.
+4. telemetry export 경로를 `agent_framework.observability.configure_otel_providers(...)`로 통일합니다.
+    - **OTLP 경로**: `OTEL_EXPORTER_OTLP_*` 환경 변수가 있으면 Agent Framework가 기본 OTLP exporter를 구성합니다.
+    - **Application Insights 경로**: Azure Monitor exporter를 생성해 `configure_otel_providers(exporters=[...])`에 추가 exporter로 전달합니다.
+    - **둘 다 설정된 경우**: OTLP exporter와 Azure Monitor exporter를 함께 등록해 같은 telemetry를 두 대상으로 내보냅니다.
     - **백엔드 미설정**: JSON 로그만 유지합니다.
-5. 혼합 설정을 거부합니다. `APPLICATION_INSIGHTS_CONNECTION_STRING`과 OTLP exporter 변수는 함께 사용할 수 없습니다.
 
 ### 로그 동작
 
@@ -57,9 +57,10 @@ APPLICATION_INSIGHTS_CONNECTION_STRING=InstrumentationKey=...;IngestionEndpoint=
 동작:
 
 - Azure Monitor OpenTelemetry 파이프라인을 구성합니다.
-- Agent Framework instrumentation을 활성화합니다.
+- Agent Framework의 단일 OpenTelemetry provider 구성 경로를 사용합니다.
+- Azure Monitor trace, log, metric exporter를 등록합니다.
 - 민감한 데이터 수집은 기본적으로 꺼진 상태를 유지합니다. 로컬/테스트에서 `ENABLE_SENSITIVE_DATA=true`를 명시한 경우에만 Agent Framework의 prompt, completion 등 민감 payload 수집을 허용합니다.
-- OTLP exporter 변수는 모두 비워야 합니다.
+- OTLP exporter 변수와 함께 설정하면 Application Insights와 OTLP 백엔드 양쪽으로 같은 telemetry를 export합니다.
 
 ### 2. OTLP 백엔드
 
@@ -122,7 +123,7 @@ OTEL_EXPORTER_OTLP_HEADERS=
 
 - 모든 `OTEL_*` 및 `ENABLE_*` observability 변수는 Agent Framework OTEL 설정 전에 프로세스 환경 변수로 전달됩니다.
 - `ENABLE_SENSITIVE_DATA`는 명시적인 로컬/테스트 opt-in 용도로만 둡니다. Application Insights 경로에서는 `1`, `true`, `yes`, `on` 값을 `enable_sensitive_data=True`로 반영하고, 그 외 값은 비활성으로 처리합니다.
-- `APPLICATION_INSIGHTS_CONNECTION_STRING`과 OTLP exporter 변수는 함께 설정하지 마세요.
+- `APPLICATION_INSIGHTS_CONNECTION_STRING`과 OTLP exporter 변수를 함께 설정하면 두 대상으로 중복 export합니다. 비용과 저장량이 늘 수 있으므로 의도한 경우에만 함께 설정합니다.
 
 ## 새 에이전트에서의 startup 패턴
 
@@ -252,7 +253,8 @@ OTEL_RESOURCE_ATTRIBUTES=deployment.environment=prod,service.namespace=homestyle
 
 중요:
 
-- Application Insights를 쓸 때는 `OTEL_EXPORTER_OTLP_*` 변수를 모두 제거합니다.
+- Application Insights만 쓸 때는 `OTEL_EXPORTER_OTLP_*` 변수를 설정하지 않습니다.
+- Application Insights와 OTLP 백엔드에 동시에 보내야 하면 `APPLICATION_INSIGHTS_CONNECTION_STRING`과 `OTEL_EXPORTER_OTLP_*`를 함께 설정합니다.
 - `ENABLE_SENSITIVE_DATA`는 명시적으로 승인된 로컬/테스트 상황이 아니면 비활성 상태로 유지합니다.
 
 ### OTLP HTTP 백엔드 예시
@@ -278,16 +280,16 @@ OTEL_EXPORTER_OTLP_HEADERS=authorization=Bearer <token>
 from homestyle_shared.infrastructure.observability import bind_correlation_id, build_logger
 
 
-logger = build_logger("my_agent")
-run_logger, correlation_id = bind_correlation_id(logger)
-run_logger.info("my_agent_started", task="sample")
+_logger = build_logger("my_agent")
+logger, correlation_id = bind_correlation_id(_logger)
+logger.info("my_agent_started", task="sample")
 ```
 
 가이드:
 
 - `grounded_answer_started`처럼 안정적인 event 이름을 사용합니다.
 - 민감하지 않은 dimension만 기록합니다.
-- raw prompt나 사용자 원문 대신 길이, 개수, 상태값, 리소스 이름을 우선 기록합니다.
+- raw prompt나 사용자 원문 대신 길이, 개수, 상태값, 리소스 이름을 우선 기록합니다. 단, 답변품질 개선을 위해 원문이 꼭 필요한 경우 `ENABLE_SENSITIVE_DATA=true`로 명시적으로 opt-in한 상황에서만 기록합니다.
 
 ## 검증 체크리스트
 
@@ -295,10 +297,11 @@ run_logger.info("my_agent_started", task="sample")
 
 1. `configure_process_observability(...)`가 startup에서 한 번만 호출되는지 확인합니다.
 2. JSON 로그가 stdout에 계속 출력되는지 확인합니다.
-3. 백엔드 경로가 하나만 활성화되어 있는지 확인합니다.
-   - Application Insights 또는
-   - OTLP
-4. 선택한 백엔드에 trace, log, metric이 도착하는지 확인합니다.
+3. 의도한 exporter 조합이 활성화되어 있는지 확인합니다.
+    - Application Insights
+    - OTLP
+    - Application Insights + OTLP
+4. 선택한 백엔드 또는 백엔드들에 trace, log, metric이 도착하는지 확인합니다.
 5. 애플리케이션 로그에 correlation ID가 포함되는지 확인합니다.
 6. prompt, completion 등 민감한 payload가 기본값으로 export되지 않는지 확인합니다.
 
@@ -314,8 +317,8 @@ run_logger.info("my_agent_started", task="sample")
 
 ### `APPLICATION_INSIGHTS_CONNECTION_STRING` 관련 `ValueError`가 발생하는 경우
 
-Application Insights와 OTLP exporter 설정이 동시에 켜진 상태입니다.
-둘 중 하나만 남기고 나머지는 제거하세요.
+OpenTelemetry provider가 이미 다른 설정으로 초기화된 뒤 Application Insights exporter를 추가하려는 상태일 수 있습니다.
+`configure_process_observability(...)`를 프로세스 시작 시점에 한 번만 호출하고, 동시에 보낼 백엔드는 첫 호출 전에 모두 환경 변수로 준비하세요.
 
 ### 로그는 나오는데 trace가 없는 경우
 

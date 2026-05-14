@@ -146,21 +146,21 @@ uv run python scripts/evaluate_ask_grounded_qa.py
 ```
 
 주요 옵션:
-- --questions <path>
-- --ask-endpoint <url>
-- --output-dir <path>
-- --timeout-seconds <float>
-- --max-context-chars <int>
-- --evaluators <list>
-- --skip-evaluate
-- --reuse-dataset
-- --foundry-upload-mode cloud|classic|both|disabled
-- --foundry-trace-evaluate
-- --foundry-trace-only
-- --trace-agent-id <agent-id>
-- --trace-lookback-hours <int>
-- --trace-max-traces <int>
-- --trace-evaluators <list>
+- `--questions <path>`: 평가 질문 파일 경로(JSON 또는 JSONL). 기본값은 `tests/e2e/observability_questions.json`
+- `--ask-endpoint <url>`: `/ask` 엔드포인트 URL. 기본값은 `http://127.0.0.1:8000/ask`
+- `--output-dir <path>`: 결과 파일 출력 디렉터리. 기본값은 `.eval/grounded-qa`
+- `--timeout-seconds <float>`: `/ask` 호출과 평가 단계의 타임아웃 시간(초). 기본값은 60
+- `--max-context-chars <int>`: context 문자 수 상한. 초과하면 truncate됨. 기본값은 10000
+- `--evaluators <list>`: 사용할 evaluator 목록. 공백으로 구분. 기본값은 `groundedness relevance coherence fluency`. 선택지: `similarity`
+- `--skip-evaluate`: true일 때 데이터셋만 생성하고 평가 단계를 건너뜀
+- `--reuse-dataset`: true일 때 기존 `ask_grounded_qa_dataset.jsonl`을 그대로 사용하고 `/ask` 호출, 데이터셋 생성을 건너뜀
+- `--foundry-upload-mode <mode>`: Foundry 업로드 모드. 선택지: `cloud`(신포털), `classic`(구포털), `both`(둘 다), `disabled`(업로드 안 함). 기본값은 `cloud`
+- `--foundry-trace-evaluate`: true일 때 데이터셋 평가 후 운영 trace evaluation도 함께 실행
+- `--foundry-trace-only`: true일 때 데이터셋 평가를 건너뛰고 Application Insights trace evaluation만 실행
+- `--trace-agent-id <agent-id>`: trace의 `gen_ai.agent.id` 값. 예: `homestyle-agent:1`. trace evaluation에 필수
+- `--trace-lookback-hours <int>`: Application Insights에서 조회할 trace의 최근 시간 범위. 기본값은 1
+- `--trace-max-traces <int>`: 평가할 최대 trace 수. 기본값은 50
+- `--trace-evaluators <list>`: trace evaluation용 evaluator. 기본값은 `relevance coherence fluency`. 선택지: `intent_resolution`
 
 예시:
 

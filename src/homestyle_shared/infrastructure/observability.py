@@ -2,16 +2,32 @@ import importlib.metadata
 import logging
 import os
 import sys
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol, TypeAlias
 from uuid import uuid4
 
 import structlog
 
+if TYPE_CHECKING:
+    from opentelemetry.sdk._logs.export import LogRecordExporter
+    from opentelemetry.sdk.metrics.export import MetricExporter
+    from opentelemetry.sdk.trace.export import SpanExporter
+
+TelemetryExporter: TypeAlias = "LogRecordExporter | SpanExporter | MetricExporter"
+SpanAttributeValue: TypeAlias = (
+    str
+    | bool
+    | int
+    | float
+    | Sequence[str]
+    | Sequence[bool]
+    | Sequence[int]
+    | Sequence[float]
+)
+
 _AZURE_MONITOR_CONNECTION_STRING: str | None = None
 _AGENT_FRAMEWORK_OTEL_CONFIGURED = False
-_AGENT_FRAMEWORK_INSTRUMENTATION_ENABLED = False
 _APPLICATION_OTEL_LOGGING_HANDLER_MARKER = "_application_otel_logging_handler"
 _OTEL_INTERNAL_LOGGER_PREFIXES = ("opentelemetry.", "grpc")
 _AZURE_SDK_LOGGER_PREFIX = "azure"
@@ -42,11 +58,8 @@ def configure_process_observability(
     env: Mapping[str, str] | None = None,
     reset_logging: bool = True,
 ) -> None:
-    global _AZURE_MONITOR_CONNECTION_STRING
     values = os.environ if env is None else env
     _apply_agent_framework_observability_env(values)
-    if application_insights_connection_string:
-        _reject_conflicting_otlp_exporter_configuration(values)
 
     resolved_level = _resolve_log_level(log_level)
     logging.basicConfig(
@@ -70,15 +83,15 @@ def configure_process_observability(
         logger_factory=structlog.stdlib.LoggerFactory(),
         cache_logger_on_first_use=True,
     )
+    enable_sensitive_data = _is_enabled(values.get("ENABLE_SENSITIVE_DATA", ""))
     if application_insights_connection_string:
-        if _AZURE_MONITOR_CONNECTION_STRING != application_insights_connection_string:
-            _configure_azure_monitor(application_insights_connection_string)
-            _AZURE_MONITOR_CONNECTION_STRING = application_insights_connection_string
-        _enable_agent_framework_instrumentation_once(
-            enable_sensitive_data=_is_enabled(values.get("ENABLE_SENSITIVE_DATA", "")),
+        _configure_azure_monitor_otel_once(
+            application_insights_connection_string,
+            enable_sensitive_data=enable_sensitive_data,
         )
+        _attach_application_otel_logging_handler(resolved_level)
     elif _has_otlp_exporter_configuration(values):
-        _configure_agent_framework_otel_once()
+        _configure_agent_framework_otel_once(enable_sensitive_data=enable_sensitive_data)
         _attach_application_otel_logging_handler(resolved_level)
 
 
@@ -99,7 +112,7 @@ def start_request_span(
     name: str,
     *,
     tracer_name: str = _DEFAULT_TRACER_NAME,
-    attributes: Mapping[str, object] | None = None,
+    attributes: Mapping[str, SpanAttributeValue | None] | None = None,
 ) -> Iterator["_RequestSpan"]:
     from opentelemetry import trace
 
@@ -115,7 +128,7 @@ def start_request_span(
 
 
 class _RequestSpan(Protocol):
-    def set_attribute(self, key: str, value: object) -> None: ...
+    def set_attribute(self, key: str, value: SpanAttributeValue) -> None: ...
 
 
 def _resolve_log_level(log_level: str) -> int:
@@ -127,52 +140,64 @@ def _quiet_azure_sdk_http_logs() -> None:
     logging.getLogger(_AZURE_SDK_LOGGER_PREFIX).setLevel(logging.WARNING)
 
 
-def _configure_azure_monitor(connection_string: str) -> None:
+def _configure_azure_monitor_otel_once(
+    connection_string: str,
+    *,
+    enable_sensitive_data: bool,
+) -> None:
     global _AZURE_MONITOR_CONNECTION_STRING
     if _AZURE_MONITOR_CONNECTION_STRING == connection_string:
         return
 
-    from azure.monitor.opentelemetry import configure_azure_monitor
+    if _AGENT_FRAMEWORK_OTEL_CONFIGURED:
+        raise ValueError("OpenTelemetry providers are already configured with a different backend")
 
-    configure_azure_monitor(connection_string=connection_string)
+    _configure_agent_framework_otel_once(
+        exporters=_create_azure_monitor_exporters(connection_string),
+        enable_sensitive_data=enable_sensitive_data,
+    )
     _AZURE_MONITOR_CONNECTION_STRING = connection_string
 
 
-def _reject_conflicting_otlp_exporter_configuration(env: Mapping[str, str]) -> None:
-    configured_names = _configured_otlp_exporter_env_vars(env)
-    if not configured_names:
-        return
-
-    joined_names = ", ".join(configured_names)
-    raise ValueError(
-        "APPLICATION_INSIGHTS_CONNECTION_STRING cannot be used with OTLP exporter "
-        f"configuration: {joined_names}",
+def _create_azure_monitor_exporters(connection_string: str) -> list[TelemetryExporter]:
+    from azure.monitor.opentelemetry.exporter import (
+        AzureMonitorLogExporter,
+        AzureMonitorMetricExporter,
+        AzureMonitorTraceExporter,
     )
 
+    return [
+        AzureMonitorTraceExporter(connection_string=connection_string),
+        AzureMonitorLogExporter(connection_string=connection_string),
+        AzureMonitorMetricExporter(connection_string=connection_string),
+    ]
 
-def _configure_agent_framework_otel_once() -> None:
+
+def _configure_agent_framework_otel_once(
+    *,
+    exporters: list[TelemetryExporter] | None = None,
+    enable_sensitive_data: bool,
+) -> None:
     global _AGENT_FRAMEWORK_OTEL_CONFIGURED
     if _AGENT_FRAMEWORK_OTEL_CONFIGURED:
         return
 
-    _configure_agent_framework_otel_providers()
+    _configure_agent_framework_otel_providers(
+        exporters=exporters,
+        enable_sensitive_data=enable_sensitive_data,
+    )
     _AGENT_FRAMEWORK_OTEL_CONFIGURED = True
 
 
-def _enable_agent_framework_instrumentation_once(*, enable_sensitive_data: bool) -> None:
-    global _AGENT_FRAMEWORK_INSTRUMENTATION_ENABLED
-    if _AGENT_FRAMEWORK_INSTRUMENTATION_ENABLED:
-        return
-
-    _enable_agent_framework_instrumentation(enable_sensitive_data)
-    _AGENT_FRAMEWORK_INSTRUMENTATION_ENABLED = True
-
-
-def _configure_agent_framework_otel_providers() -> None:
+def _configure_agent_framework_otel_providers(
+    *,
+    exporters: list[TelemetryExporter] | None,
+    enable_sensitive_data: bool,
+) -> None:
     _patch_agent_framework_version()
     from agent_framework.observability import configure_otel_providers
 
-    configure_otel_providers()
+    configure_otel_providers(exporters=exporters, enable_sensitive_data=enable_sensitive_data)
 
 
 def _attach_application_otel_logging_handler(level: int) -> None:
@@ -189,13 +214,6 @@ def _attach_application_otel_logging_handler(level: int) -> None:
     handler.addFilter(_ApplicationTelemetryLogFilter())
     setattr(handler, _APPLICATION_OTEL_LOGGING_HANDLER_MARKER, True)
     root_logger.addHandler(handler)
-
-
-def _enable_agent_framework_instrumentation(enable_sensitive_data: bool) -> None:
-    _patch_agent_framework_version()
-    from agent_framework.observability import enable_instrumentation
-
-    enable_instrumentation(enable_sensitive_data=enable_sensitive_data)
 
 
 def _patch_agent_framework_version() -> None:
