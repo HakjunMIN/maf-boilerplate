@@ -1,6 +1,28 @@
-# scripts/sample_vlm_index.py — 수동 E2E 테스트
+# scripts
 
-## 목적
+## scripts/measure_lsp_context_impact.py — LSP 컨텍스트 절감 측정
+
+grep으로 심볼이 포함된 파일 전체를 읽는 방식과 LSP reference 목록만 읽는 방식을 같은 토큰 추정식으로 비교한다. LSP 출력은 VS Code symbol references 또는 에이전트의 `vscode_listCodeUsages` 결과를 텍스트 파일로 저장해 입력한다.
+
+```bash
+uv run python scripts/measure_lsp_context_impact.py DiscoveredUrl \
+  --lsp-usages-file /path/to/discovered-url-usages.txt
+```
+
+출력 JSON의 주요 필드는 다음과 같다.
+
+| 필드 | 설명 |
+|------|------|
+| `grep_tokens` | grep식 전체 파일 컨텍스트의 추정 토큰 수 |
+| `lsp_tokens` | LSP usage line 컨텍스트의 추정 토큰 수 |
+| `token_reduction_percent` | LSP 사용으로 줄어든 추정 토큰 비율 |
+| `scanned_lines` | grep식 접근에서 읽는 전체 라인 수 |
+| `focus_lines` | LSP가 지목한 usage 라인 수 |
+| `focus_multiplier` | 전체 라인 수가 usage 라인 수보다 몇 배 큰지 |
+
+## scripts/sample_vlm_index.py — 수동 E2E 테스트
+
+### 목적
 
 인제스천 파이프라인 전체를 로컬에서 수동으로 검증하는 스크립트.  
 실제 사이트(`homestyle.lge.co.kr`)에서 최대 10페이지를 크롤링하고,  
@@ -13,7 +35,7 @@ robots.txt → URL 수집 → Playwright 렌더링 → DOM 추출
 
 ---
 
-## 사전 조건
+### 사전 조건
 
 | 항목 | 최소 버전 / 설정 |
 |------|-----------------|
@@ -24,7 +46,7 @@ robots.txt → URL 수집 → Playwright 렌더링 → DOM 추출
 
 ---
 
-## .env 설정
+### .env 설정
 
 `.env.example`을 복사해 `.env`로 만든 뒤 아래 값을 채운다.
 
@@ -52,7 +74,7 @@ AZURE_SEARCH_ADMIN_KEY=<admin-key>
 
 ---
 
-## 실행
+### 실행
 
 ```bash
 # 가상환경 활성화
@@ -81,7 +103,7 @@ PYTHONPATH=src python scripts/sample_vlm_index.py \
 
 ---
 
-## 출력물
+### 출력물
 
 실행 후 `--output-dir`(기본 `.sample-vlm-crawl`) 아래에 생성된다.
 
@@ -100,7 +122,7 @@ Azure AI Search `AZURE_SEARCH_INDEX_NAME` 인덱스에 섹션 단위 벡터 문�
 
 ---
 
-## 재실행 동작
+### 재실행 동작
 
 `pages/` 캐시에 저장된 페이지는 conditional fetch(ETag / content hash)로 변경 여부를 확인한다.  
 변경이 없으면 스킵되므로 0 chunks가 인덱싱될 수 있다.  
@@ -112,7 +134,7 @@ rm -rf .sample-vlm-crawl
 
 ---
 
-## 검증 포인트
+### 검증 포인트
 
 | 단계 | 정상 로그 예시 |
 |------|---------------|

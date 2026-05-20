@@ -86,6 +86,7 @@ flowchart TD
 
 - [PRD.md](./PRD.md): 문제 정의, 운영 경계, 인덱싱/에이전트 결정 사항
 - [UBIQUITOUS_LANGUAGE.md](./UBIQUITOUS_LANGUAGE.md): 팀 내 용어를 고정한 문서
+- [docs/lsp-agentic-coding.md](./docs/lsp-agentic-coding.md): Python LSP 기반 코드 탐색과 에이전틱 코딩 운영 방식
 - [scripts/README.md](./scripts/README.md): 수동 E2E 검증 스크립트 설명
 
 ## 저장소 구조
